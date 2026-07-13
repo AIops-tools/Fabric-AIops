@@ -146,7 +146,7 @@ class PolicyEngine:
         # Bypass mode — log context for audit trail. Log only parameter NAMES,
         # never values: param values may carry passwords/tokens, and this path
         # can be reached by callers that did not pre-redact.
-        if os.environ.get("ENDPOINT_POLICY_DISABLED") == "1":
+        if os.environ.get("FABRIC_POLICY_DISABLED") == "1":
             param_names = sorted(params.keys()) if isinstance(params, dict) else []
             _log.warning(
                 "Policy DISABLED — bypassing check: operation=%s env=%s risk=%s param_keys=%s",

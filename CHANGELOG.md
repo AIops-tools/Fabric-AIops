@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.1
+
+- Fix: governance env-var prefix `ENDPOINT_*` → `FABRIC_*` (operator budget/policy/audit overrides like `FABRIC_MAX_TOOL_CALLS`, `FABRIC_POLICY_DISABLED`, `FABRIC_AUDIT_APPROVED_BY` now take effect; the v0.1.0 harness read the wrong namespace). No API or tool changes.
+
+
 All notable changes to fabric-aiops are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses semantic
 versioning (currently 0.x preview — the API may change).

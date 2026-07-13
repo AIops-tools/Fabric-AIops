@@ -7,11 +7,11 @@ failure mode behind the "deleting one snapshot burned 26k tokens over 30 min"
 incident. Two layers, both enforced from the ``@governed_tool`` pre-check:
 
 1. **Hard ceilings (opt-in via env).** Total tool calls and cumulative
-   wall-time per process. ``ENDPOINT_MAX_TOOL_CALLS`` / ``ENDPOINT_MAX_TOOL_SECONDS``.
+   wall-time per process. ``FABRIC_MAX_TOOL_CALLS`` / ``FABRIC_MAX_TOOL_SECONDS``.
    Unset (the default) means no ceiling — existing behavior is unchanged.
 
 2. **Runaway breaker (on by default).** The same ``(tool, params)`` called more
-   than ``ENDPOINT_RUNAWAY_MAX`` times within ``ENDPOINT_RUNAWAY_WINDOW_SEC`` trips a
+   than ``FABRIC_RUNAWAY_MAX`` times within ``FABRIC_RUNAWAY_WINDOW_SEC`` trips a
    short cooldown. Catches a tight poll/retry loop without affecting normal,
    varied tool use. Defaults are generous (25 identical calls in 120s).
 
@@ -80,7 +80,7 @@ class BudgetTracker:
     """Thread-safe per-process budget + runaway guard.
 
     Limits are read from the environment on every check so they can be raised
-    mid-session (e.g. an operator sets ``ENDPOINT_RUNAWAY_MAX`` higher) without a
+    mid-session (e.g. an operator sets ``FABRIC_RUNAWAY_MAX`` higher) without a
     restart. State is in-memory and per process — it resets when the MCP server
     restarts, which is the correct scope for a single agent session.
     """
@@ -93,20 +93,20 @@ class BudgetTracker:
 
     @staticmethod
     def _max_calls() -> int | None:
-        return _env_int("ENDPOINT_MAX_TOOL_CALLS", None)
+        return _env_int("FABRIC_MAX_TOOL_CALLS", None)
 
     @staticmethod
     def _max_seconds() -> int | None:
-        return _env_int("ENDPOINT_MAX_TOOL_SECONDS", None)
+        return _env_int("FABRIC_MAX_TOOL_SECONDS", None)
 
     @staticmethod
     def _runaway_max() -> int:
         # 0 or negative disables the runaway breaker.
-        return _env_int("ENDPOINT_RUNAWAY_MAX", _DEFAULT_RUNAWAY_MAX) or 0
+        return _env_int("FABRIC_RUNAWAY_MAX", _DEFAULT_RUNAWAY_MAX) or 0
 
     @staticmethod
     def _runaway_window() -> int:
-        return _env_int("ENDPOINT_RUNAWAY_WINDOW_SEC", _DEFAULT_RUNAWAY_WINDOW_SEC) or 0
+        return _env_int("FABRIC_RUNAWAY_WINDOW_SEC", _DEFAULT_RUNAWAY_WINDOW_SEC) or 0
 
     # ── Enforcement ───────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ class BudgetTracker:
             if max_calls is not None and self._state.total_calls >= max_calls:
                 raise BudgetExceeded(
                     f"Tool-call budget reached: {self._state.total_calls} calls "
-                    f"(ENDPOINT_MAX_TOOL_CALLS={max_calls}). Stop and summarize what "
+                    f"(FABRIC_MAX_TOOL_CALLS={max_calls}). Stop and summarize what "
                     f"is done; raise the ceiling only if the work genuinely needs "
                     f"more calls.",
                     rule="budget_calls",
@@ -137,7 +137,7 @@ class BudgetTracker:
                 raise BudgetExceeded(
                     f"Cumulative tool wall-time budget reached: "
                     f"{self._state.total_seconds:.0f}s "
-                    f"(ENDPOINT_MAX_TOOL_SECONDS={max_seconds}). Stop and report "
+                    f"(FABRIC_MAX_TOOL_SECONDS={max_seconds}). Stop and report "
                     f"progress rather than continuing.",
                     rule="budget_seconds",
                 )
@@ -159,7 +159,7 @@ class BudgetTracker:
                         f"with identical arguments in {window}s. This usually means "
                         f"a poll/retry loop is stuck. Stop re-calling — check the "
                         f"operation's status once, or wait, instead of looping. "
-                        f"(Raise ENDPOINT_RUNAWAY_MAX if this is genuinely intended.)",
+                        f"(Raise FABRIC_RUNAWAY_MAX if this is genuinely intended.)",
                         rule="budget_runaway",
                     )
                 dq.append(now)

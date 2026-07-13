@@ -82,7 +82,7 @@ Every MCP tool passes through the bundled `@governed_tool` harness:
   `FABRIC_AIOPS_HOME`).
 - **Budget / runaway guard** — token and call budgets trip a circuit breaker.
 - **Risk tiers** — graduated autonomy; high-risk ops can require a named approver
-  (`ENDPOINT_AUDIT_APPROVED_BY` / `ENDPOINT_AUDIT_RATIONALE` — the env-var names
+  (`FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE` — the env-var names
   the bundled harness reads).
 - **Undo recording** — reversible writes record an inverse descriptor built from
   the fetched before-state.

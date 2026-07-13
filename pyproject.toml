@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fabric-aiops"
-version = "0.1.0"
+version = "0.1.1"
 description = "Governed AI-ops for Cisco Meraki network fabrics: uplink RCA, health scoring & config-drift with a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"

@@ -34,13 +34,13 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 (`fabric_aiops.governance`):
 - **Audit** — every call logged to a local SQLite DB under `~/.fabric-aiops/`
   (relocatable via `FABRIC_AIOPS_HOME`), agent-attributed, secret-redacted.
-- **Token/runaway budget** — hard ceilings (`ENDPOINT_MAX_TOOL_CALLS` /
-  `ENDPOINT_MAX_TOOL_SECONDS` — the env-var names the bundled harness reads) plus
+- **Token/runaway budget** — hard ceilings (`FABRIC_MAX_TOOL_CALLS` /
+  `FABRIC_MAX_TOOL_SECONDS` — the env-var names the bundled harness reads) plus
   an on-by-default guard that trips a tight poll/retry loop, preventing unbounded
   Dashboard API consumption (and the associated rate-limit exposure).
 - **Graduated risk tiers** — `~/.fabric-aiops/rules.yaml` `risk_tiers` gate writes
   by environment/tag; the highest tiers require a recorded approver
-  (`ENDPOINT_AUDIT_APPROVED_BY` / `ENDPOINT_AUDIT_RATIONALE`).
+  (`FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE`).
 - **Undo-token recording** — mutating/reversible writes fetch the **real
   before-state first** and record a faithful inverse descriptor (e.g.
   `update_device` restores the prior attributes; `bind`↔`unbind`; `claim`↔`remove`).

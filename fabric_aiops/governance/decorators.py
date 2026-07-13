@@ -193,8 +193,8 @@ class _CallState:
         # Sourced from env so an approval gate / pilot can inject context
         # without changing every tool signature. risk_tier is filled by the
         # policy pre-check (graduated autonomy).
-        self.rationale = os.environ.get("ENDPOINT_AUDIT_RATIONALE", "")
-        self.approved_by = os.environ.get("ENDPOINT_AUDIT_APPROVED_BY", "")
+        self.rationale = os.environ.get("FABRIC_AUDIT_RATIONALE", "")
+        self.approved_by = os.environ.get("FABRIC_AUDIT_APPROVED_BY", "")
         self.risk_tier = ""
 
 
@@ -249,7 +249,7 @@ def _pre_check(state: _CallState) -> None:
 
     # Graduated autonomy — what approval tier does this op need? Record it on
     # the audit trail, and enforce: tiers that require a named approver (dual /
-    # review) are denied when none was recorded (ENDPOINT_AUDIT_APPROVED_BY).
+    # review) are denied when none was recorded (FABRIC_AUDIT_APPROVED_BY).
     tier = state.policy.required_approval_tier(
         state.tool_name,
         env=state.env,
@@ -261,8 +261,8 @@ def _pre_check(state: _CallState) -> None:
         reason = (
             f"Operation '{state.tool_name}' on '{state.env or 'target'}' requires "
             f"'{tier.tier}' approval (rule: {tier.rule}) but no approver is recorded. "
-            f"Set ENDPOINT_AUDIT_APPROVED_BY to the authorizing human (and "
-            f"ENDPOINT_AUDIT_RATIONALE to why) before retrying."
+            f"Set FABRIC_AUDIT_APPROVED_BY to the authorizing human (and "
+            f"FABRIC_AUDIT_RATIONALE to why) before retrying."
         )
         if tier.reason:
             reason += f" Policy note: {tier.reason}"
