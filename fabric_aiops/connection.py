@@ -1,0 +1,214 @@
+"""Connection management for network-fabric controllers (Cisco Meraki today).
+
+Thin httpx wrapper with per-target session reuse and static API-key auth:
+
+  * The controller issues a long-lived **API key** (Meraki: Dashboard →
+    Organization → Settings → API access). Every request carries it in the auth
+    header the target's :class:`~fabric_aiops.platform.Platform` builds —
+    ``Authorization: Bearer <apiKey>`` by default, or the legacy
+    ``X-Cisco-Meraki-API-Key`` header (``auth_style: meraki-key``).
+  * ``api_base`` already includes the API version path
+    (``https://api.meraki.com/api/v1``), so callers pass resource paths like
+    ``/organizations`` or ``/networks/{id}/devices``.
+  * List endpoints paginate via a ``Link`` header + ``perPage``/``startingAfter``;
+    :meth:`FabricConnection.get_pages` follows ``rel=next`` and aggregates.
+
+All non-2xx responses are translated centrally into ``FabricApiError`` with a
+teaching message — HTTP errors are translated at the connection layer rather
+than leaking raw tracebacks.
+
+The httpx client is injectable for tests: pass ``client=`` to
+``FabricConnection`` to substitute a mock that implements ``request`` / ``close``.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+from fabric_aiops.config import AppConfig, TargetConfig, load_config
+from fabric_aiops.platform import parse_next_link
+
+_TIMEOUT = 30.0
+_MAX_PAGES = 25
+
+
+class FabricApiError(Exception):
+    """A controller REST API call failed; carries a teaching message + status."""
+
+    def __init__(self, message: str, *, status_code: int | None = None, path: str = "") -> None:
+        self.status_code = status_code
+        self.path = path
+        super().__init__(message)
+
+
+def _teaching_message(status: int, path: str, body: str, label: str) -> str:
+    """Map a non-2xx status to an actionable, teaching error message."""
+    snippet = body[:200].strip()
+    if status in (401, 403):
+        return (
+            f"Authentication/authorization failed ({status}) on {label} {path}. "
+            f"Check the API key (Dashboard → Organization → Settings → API access) "
+            f"and that the key's admin has access to this organization. {snippet}"
+        )
+    if status == 404:
+        return (
+            f"Resource not found (404) on {label} {path}. The id may be stale — "
+            f"list the parent collection first to get a current id. {snippet}"
+        )
+    if status == 429:
+        return (
+            f"Rate limited (429) on {label} {path}. The Dashboard API caps requests "
+            f"per organization; back off and retry after the Retry-After delay. {snippet}"
+        )
+    if status in (400, 422):
+        return (
+            f"Validation error ({status}) on {label} {path}. The controller rejected "
+            f"the request body — check required fields and value formats. {snippet}"
+        )
+    if status in (500, 502, 503, 504):
+        return (
+            f"{label} server error ({status}) on {path}. The controller may be busy; "
+            f"retry shortly. {snippet}"
+        )
+    return f"{label} API error ({status}) on {path}. {snippet}"
+
+
+class FabricConnection:
+    """A single authenticated session against one network-fabric controller target."""
+
+    def __init__(self, target: TargetConfig, client: Any | None = None) -> None:
+        self._target = target
+        platform = target.platform_obj
+        self._client = client or httpx.Client(
+            base_url=target.api_base,
+            verify=target.verify_ssl,
+            timeout=_TIMEOUT,
+            headers=platform.auth_headers(target.api_key, target.auth_style),
+        )
+
+    @property
+    def target(self) -> TargetConfig:
+        return self._target
+
+    def _raw_request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Issue a request and return the raw response, translating transport errors."""
+        try:
+            return self._client.request(method, path, **kwargs)
+        except httpx.HTTPError as exc:
+            raise FabricApiError(
+                f"Could not reach {self._target.platform_obj.label} at "
+                f"{self._target.api_base} ({method} {path}): {exc}. Check the base "
+                f"URL and that the controller REST API is reachable.",
+                path=path,
+            ) from exc
+
+    def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Issue a request and return parsed JSON, translating errors centrally."""
+        resp = self._raw_request(method, path, **kwargs)
+        self._raise_for_status(resp, path)
+        return self._parse(resp)
+
+    def _raise_for_status(self, resp: Any, path: str) -> None:
+        if not (200 <= resp.status_code < 300):
+            raise FabricApiError(
+                _teaching_message(
+                    resp.status_code, path, resp.text, self._target.platform_obj.label
+                ),
+                status_code=resp.status_code,
+                path=path,
+            )
+
+    @staticmethod
+    def _parse(resp: Any) -> Any:
+        if not resp.content:
+            return {}
+        try:
+            return resp.json()
+        except ValueError:
+            return {}
+
+    def get(self, path: str, **kwargs: Any) -> Any:
+        return self.request("GET", path, **kwargs)
+
+    def post(self, path: str, **kwargs: Any) -> Any:
+        return self.request("POST", path, **kwargs)
+
+    def put(self, path: str, **kwargs: Any) -> Any:
+        return self.request("PUT", path, **kwargs)
+
+    def delete(self, path: str, **kwargs: Any) -> Any:
+        return self.request("DELETE", path, **kwargs)
+
+    def get_pages(self, path: str, params: dict | None = None, max_pages: int = _MAX_PAGES) -> list:
+        """GET a paginated list resource, following the ``Link`` rel=next header.
+
+        Aggregates every page's array (Meraki list endpoints return bare JSON
+        arrays) up to ``max_pages`` so a runaway pagination loop is bounded. The
+        first request uses ``path``+``params``; subsequent requests follow the
+        absolute ``next`` URL the controller returns.
+        """
+        results: list = []
+        next_target: str = path
+        next_params = dict(params or {})
+        for _ in range(max(1, max_pages)):
+            resp = self._raw_request("GET", next_target, params=next_params or None)
+            self._raise_for_status(resp, next_target)
+            page = self._parse(resp)
+            if isinstance(page, list):
+                results.extend(page)
+            elif isinstance(page, dict):
+                results.append(page)
+            headers = getattr(resp, "headers", {}) or {}
+            nxt = parse_next_link(headers.get("Link") or headers.get("link"))
+            if not nxt:
+                break
+            next_target = nxt
+            next_params = {}  # the next URL already carries startingAfter
+        return results
+
+    def close(self) -> None:
+        self._client.close()
+
+
+class ConnectionManager:
+    """Manages connections to multiple controller targets with session reuse."""
+
+    def __init__(self, config: AppConfig) -> None:
+        self._config = config
+        self._connections: dict[str, FabricConnection] = {}
+
+    @classmethod
+    def from_config(cls, config: AppConfig | None = None) -> ConnectionManager:
+        cfg = config or load_config()
+        return cls(cfg)
+
+    def connect(self, target_name: str | None = None) -> FabricConnection:
+        """Connect to a target by name, or the default target."""
+        target = (
+            self._config.get_target(target_name)
+            if target_name
+            else self._config.default_target
+        )
+        cached = self._connections.get(target.name)
+        if cached is not None:
+            return cached
+        conn = FabricConnection(target)
+        self._connections[target.name] = conn
+        return conn
+
+    def disconnect(self, target_name: str) -> None:
+        conn = self._connections.pop(target_name, None)
+        if conn is not None:
+            conn.close()
+
+    def disconnect_all(self) -> None:
+        for name in list(self._connections):
+            self.disconnect(name)
+
+    def list_targets(self) -> list[str]:
+        return [t.name for t in self._config.targets]
+
+    def list_connected(self) -> list[str]:
+        return list(self._connections.keys())
