@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.2
+
+- Fix: `FABRIC_AIOPS_HOME` now also relocates `config.yaml` (was hardcoded to `~/.fabric-aiops`).
+- Fix: **CLI writes are now audited + undo-recorded** via the governance path — previously only the MCP tools recorded audit/undo; CLI `manage`/`remediate`/etc. writes now go through the same `@governed_tool` layer (they keep their dry-run + double-confirm). CLI write output is now the governed JSON result. No API/tool changes.
+
+
 ## v0.1.1
 
 - Fix: governance env-var prefix `ENDPOINT_*` → `FABRIC_*` (operator budget/policy/audit overrides like `FABRIC_MAX_TOOL_CALLS`, `FABRIC_POLICY_DISABLED`, `FABRIC_AUDIT_APPROVED_BY` now take effect; the v0.1.0 harness read the wrong namespace). No API or tool changes.

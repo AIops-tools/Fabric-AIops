@@ -1,4 +1,10 @@
-"""``fabric-aiops remediate`` — guarded Meraki writes (dry-run + double-confirm)."""
+"""``fabric-aiops remediate`` — guarded Meraki writes (dry-run + double-confirm).
+
+Real writes are delegated to the ``@governed_tool``-decorated functions in
+``mcp_server.tools.remediation`` so every CLI write is audited, budget-counted,
+risk-tiered and undo-recorded by the governance harness — the same path the MCP
+tools take. The dry-run preview and double-confirm gate stay in the CLI.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +20,6 @@ from fabric_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_print,
-    get_connection,
 )
 
 remediate_app = typer.Typer(
@@ -31,14 +36,13 @@ NetIdArg = Annotated[str, typer.Argument(help="Network id")]
 @cli_errors
 def reboot(serial: SerialArg, target: TargetOption = None, dry_run: DryRunOption = False) -> None:
     """Reboot a device (no undo; dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     if dry_run:
         dry_run_print(operation="reboot_device", api_call=f"POST /devices/{serial}/reboot")
         return
     double_confirm("reboot", serial)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.reboot_device(conn, serial)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(json.dumps(gov.reboot_device(serial=serial, target=target)))
 
 
 @remediate_app.command("blink-leds")
@@ -49,10 +53,11 @@ def blink_leds(
     target: TargetOption = None,
 ) -> None:
     """Blink a device's locator LEDs (low risk; no confirm needed)."""
-    from fabric_aiops.ops import remediation as ops
+    from mcp_server.tools import remediation as gov
 
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.blink_device_leds(conn, serial, duration)))
+    console.print_json(
+        json.dumps(gov.blink_device_leds(serial=serial, duration=duration, target=target))
+    )
 
 
 @remediate_app.command("update-device")
@@ -64,8 +69,6 @@ def update_device(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update device attributes (captures before-state; dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     attrs = json.loads(attrs_json)
     if dry_run:
         dry_run_print(
@@ -73,8 +76,9 @@ def update_device(
         )
         return
     double_confirm("update attributes on", serial)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.update_device(conn, serial, attrs)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(json.dumps(gov.update_device(serial=serial, attrs=attrs, target=target)))
 
 
 @remediate_app.command("update-vlan")
@@ -87,8 +91,6 @@ def update_vlan(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update an appliance VLAN (captures before-state; dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     attrs = json.loads(attrs_json)
     if dry_run:
         dry_run_print(
@@ -98,8 +100,15 @@ def update_vlan(
         )
         return
     double_confirm(f"update VLAN {vlan_id} on", network_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.update_network_vlan(conn, network_id, vlan_id, attrs)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(
+        json.dumps(
+            gov.update_network_vlan(
+                network_id=network_id, vlan_id=vlan_id, attrs=attrs, target=target
+            )
+        )
+    )
 
 
 @remediate_app.command("claim")
@@ -111,8 +120,6 @@ def claim(
     dry_run: DryRunOption = False,
 ) -> None:
     """Claim devices into a network (dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     if dry_run:
         dry_run_print(
             operation="claim_devices_into_network",
@@ -121,8 +128,13 @@ def claim(
         )
         return
     double_confirm(f"claim {len(serials)} device(s) into", network_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.claim_devices_into_network(conn, network_id, serials)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(
+        json.dumps(
+            gov.claim_devices_into_network(network_id=network_id, serials=serials, target=target)
+        )
+    )
 
 
 @remediate_app.command("remove")
@@ -134,8 +146,6 @@ def remove(
     dry_run: DryRunOption = False,
 ) -> None:
     """Remove a device from a network (dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     if dry_run:
         dry_run_print(
             operation="remove_device_from_network",
@@ -144,8 +154,13 @@ def remove(
         )
         return
     double_confirm(f"remove device {serial} from", network_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.remove_device_from_network(conn, network_id, serial)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(
+        json.dumps(
+            gov.remove_device_from_network(network_id=network_id, serial=serial, target=target)
+        )
+    )
 
 
 @remediate_app.command("bind")
@@ -158,8 +173,6 @@ def bind(
     dry_run: DryRunOption = False,
 ) -> None:
     """Bind a network to a config template (captures before-state; dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     if dry_run:
         dry_run_print(
             operation="bind_network_to_template",
@@ -168,9 +181,14 @@ def bind(
         )
         return
     double_confirm(f"bind to template {template_id}", network_id)
-    conn, _ = get_connection(target)
+    from mcp_server.tools import remediation as gov
+
     console.print_json(
-        json.dumps(ops.bind_network_to_template(conn, network_id, template_id, auto_bind))
+        json.dumps(
+            gov.bind_network_to_template(
+                network_id=network_id, template_id=template_id, auto_bind=auto_bind, target=target
+            )
+        )
     )
 
 
@@ -182,8 +200,6 @@ def unbind(
     dry_run: DryRunOption = False,
 ) -> None:
     """Unbind a network from its config template (captures before-state; dry-run + confirm)."""
-    from fabric_aiops.ops import remediation as ops
-
     if dry_run:
         dry_run_print(
             operation="unbind_network_from_template",
@@ -191,5 +207,8 @@ def unbind(
         )
         return
     double_confirm("unbind from its config template", network_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.unbind_network_from_template(conn, network_id)))
+    from mcp_server.tools import remediation as gov
+
+    console.print_json(
+        json.dumps(gov.unbind_network_from_template(network_id=network_id, target=target))
+    )

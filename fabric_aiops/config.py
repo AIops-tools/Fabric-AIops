@@ -23,13 +23,14 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from fabric_aiops.governance.paths import ops_home
 from fabric_aiops.platform import MERAKI, get_platform
 from fabric_aiops.secretstore import SecretStoreError, get_secret, has_store
 
 if TYPE_CHECKING:
     from fabric_aiops.platform import Platform
 
-CONFIG_DIR = Path.home() / ".fabric-aiops"
+CONFIG_DIR = ops_home()
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
 ENV_FILE = CONFIG_DIR / ".env"
 
