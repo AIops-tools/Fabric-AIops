@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from fabric_aiops.ops._util import clean_list, require_org
+from fabric_aiops.platform import seg
 
 MAX_ROWS = 100
 
@@ -33,7 +34,7 @@ DEFAULT_LATENCY_MS = 150.0
 def pull_uplink_loss_latency(conn: Any, org_id: str | None = None) -> list[dict]:
     """[READ] Raw MX WAN uplink loss+latency time series across the org."""
     oid = require_org(conn, org_id)
-    return clean_list(conn.get_pages(f"/organizations/{oid}/devices/uplinksLossAndLatency"))
+    return clean_list(conn.get_pages(f"/organizations/{seg(oid)}/devices/uplinksLossAndLatency"))
 
 
 def _series_stats(record: dict) -> tuple[float, float, float, float]:

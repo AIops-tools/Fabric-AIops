@@ -23,6 +23,9 @@ The httpx client is injectable for tests: pass ``client=`` to
 
 from __future__ import annotations
 
+import atexit
+import logging
+import weakref
 from typing import Any
 
 import httpx
@@ -30,8 +33,28 @@ import httpx
 from fabric_aiops.config import AppConfig, TargetConfig, load_config
 from fabric_aiops.platform import parse_next_link
 
+_log = logging.getLogger("fabric-aiops.connection")
+
 _TIMEOUT = 30.0
 _MAX_PAGES = 25
+
+# Every live ConnectionManager registers here (weakly) so the atexit hook can
+# close any cached httpx clients when the interpreter shuts down.
+_MANAGERS: weakref.WeakSet = weakref.WeakSet()
+
+
+def _close_all_managers() -> None:
+    """atexit hook: close every cached httpx client. Idempotent and error-safe —
+    close failures are logged, never raised (raising at interpreter exit only
+    obscures the real shutdown path)."""
+    for mgr in list(_MANAGERS):
+        try:
+            mgr.disconnect_all()
+        except Exception:  # noqa: BLE001 — never raise at interpreter exit
+            _log.debug("Error closing cached connections at exit", exc_info=True)
+
+
+atexit.register(_close_all_managers)
 
 
 class FabricApiError(Exception):
@@ -178,6 +201,7 @@ class ConnectionManager:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._connections: dict[str, FabricConnection] = {}
+        _MANAGERS.add(self)
 
     @classmethod
     def from_config(cls, config: AppConfig | None = None) -> ConnectionManager:

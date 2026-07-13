@@ -1,6 +1,6 @@
 """``fabric-aiops secret`` — manage the encrypted credential store.
 
-Secrets (Endpoint API keys) are stored in ``~/.fabric-aiops/secrets.enc``
+Secrets (network-fabric controller API keys) are stored in ``~/.fabric-aiops/secrets.enc``
 (Fernet, key derived from a master password via scrypt). Nothing here ever
 prints a secret value.
 """

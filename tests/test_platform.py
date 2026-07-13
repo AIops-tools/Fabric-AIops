@@ -11,6 +11,7 @@ from fabric_aiops.platform import (
     get_platform,
     parse_next_link,
     platform_names,
+    seg,
 )
 
 
@@ -140,3 +141,64 @@ def test_connection_get_pages_follows_link_header():
     conn._client = _Client()
     rows = conn.get_pages("/organizations/1/devices")
     assert [r["id"] for r in rows] == ["a", "b"]
+
+
+@pytest.mark.unit
+def test_seg_encodes_hostile_path_segments():
+    """Agent-supplied ids are URL-encoded: no traversal, no smuggled query."""
+    assert seg("N_123") == "N_123"
+    assert "/" not in seg("../admin")
+    assert "../" not in seg("../admin")
+    assert seg("a b?x=1#f") == "a%20b%3Fx%3D1%23f"
+    assert seg(42) == "42"
+
+
+@pytest.mark.unit
+def test_ops_path_interpolation_never_emits_raw_traversal():
+    """An id containing ``../`` must never reach the client as a raw ``../``
+    path segment — the ops layer routes every interpolated value through seg()."""
+    from unittest.mock import MagicMock
+
+    from fabric_aiops.ops import networks as net_ops
+    from fabric_aiops.ops import remediation as rem_ops
+
+    conn = MagicMock(name="conn")
+    conn.get.return_value = {"id": "N1"}
+    conn.post.return_value = {}
+
+    net_ops.get_network(conn, "../../admin")
+    path = conn.get.call_args[0][0]
+    assert "../" not in path
+    assert path == "/networks/..%2F..%2Fadmin"
+
+    conn.reset_mock()
+    conn.get.return_value = {"serial": "S1", "status": "online"}
+    rem_ops.reboot_device(conn, "../evil")
+    posted = conn.post.call_args[0][0]
+    assert "../" not in posted
+    assert posted == "/devices/..%2Fevil/reboot"
+
+
+@pytest.mark.unit
+def test_atexit_hook_closes_cached_clients_and_never_raises():
+    """The atexit closer shuts down every cached client, is idempotent, and
+    swallows close errors (never raises at interpreter exit)."""
+    from unittest.mock import MagicMock
+
+    from fabric_aiops import connection as conn_mod
+    from fabric_aiops.config import AppConfig
+
+    mgr = conn_mod.ConnectionManager(AppConfig(targets=[TargetConfig(name="org1")]))
+    fake = MagicMock(name="fabric-conn")
+    mgr._connections["org1"] = fake
+
+    conn_mod._close_all_managers()
+    fake.close.assert_called_once()
+    assert mgr.list_connected() == []
+
+    # Idempotent + error-safe: a second run and a failing close never raise.
+    conn_mod._close_all_managers()
+    bad = MagicMock(name="bad-conn")
+    bad.close.side_effect = RuntimeError("boom")
+    mgr._connections["org1"] = bad
+    conn_mod._close_all_managers()  # must not raise

@@ -16,8 +16,21 @@ descriptor, not a rewrite.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import quote
 
 from fabric_aiops.governance import sanitize
+
+
+def seg(value: object) -> str:
+    """URL-encode one REST *path segment* (agent-supplied ids, serials, ...).
+
+    Every value interpolated into a request path must pass through here so a
+    hostile identifier (``../``, ``?``, ``#``, spaces) cannot rewrite the path
+    or smuggle query parameters. ``safe=""`` also encodes ``/``. Query-string
+    params passed via httpx ``params=`` are NOT routed through this — httpx
+    encodes those itself.
+    """
+    return quote(str(value), safe="")
 
 # ─── registered platform names ──────────────────────────────────────────────
 MERAKI = "meraki"
@@ -145,4 +158,5 @@ __all__ = [
     "get_platform",
     "platform_names",
     "parse_next_link",
+    "seg",
 ]

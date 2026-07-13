@@ -2,8 +2,9 @@
 
 Meraki Dashboard API list endpoints return a bare JSON array; a few wrap items
 under a key. ``as_list`` normalises both. All controller-returned text reaches
-the caller only after ``sanitize()`` (prompt-injection defense), applied via the
-platform normaliser at the read boundary.
+the caller only after ``sanitize()`` (output hygiene: control/format characters
+stripped, bounded length), applied via the platform normaliser at the read
+boundary.
 """
 
 from __future__ import annotations

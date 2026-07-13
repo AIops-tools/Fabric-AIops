@@ -8,7 +8,8 @@ any external skill family — this package is its own copy of the harness:
     and undo-token recording.
   - unified SQLite audit log under ``~/.fabric-aiops/`` (override with
     ``FABRIC_AIOPS_HOME``).
-  - ``sanitize`` — prompt-injection defense for API-returned text.
+  - ``sanitize`` — output hygiene for API-returned text (control/format
+    characters stripped, bounded length).
 
 State lives under ``ops_home()`` (default ``~/.fabric-aiops``).
 """
