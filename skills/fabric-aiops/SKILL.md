@@ -96,6 +96,7 @@ Pass data straight to the analysis tools — `uplink_loss_and_latency_rca(record
 
 - Every tool is audited to `~/.fabric-aiops/audit.db` (relocatable via `FABRIC_AIOPS_HOME`).
 - High-risk ops can require a named approver: set `FABRIC_AUDIT_APPROVED_BY` and `FABRIC_AUDIT_RATIONALE` (the env-var names the bundled harness reads).
+- **Secure by default (v0.2.0+)**: with no `~/.fabric-aiops/rules.yaml`, high/critical operations are denied unless `FABRIC_AUDIT_APPROVED_BY` names an approver (set `FABRIC_AUDIT_RATIONALE` too). `fabric-aiops init` seeds a starter rules.yaml; an operator-authored rules file is honoured as-is.
 - Writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI.
 - Mutating/reversible writes fetch the real before-state and record an inverse descriptor; irreversible ops (reboot, blink) record only the before-state.
 
