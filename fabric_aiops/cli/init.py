@@ -1,9 +1,12 @@
 """``fabric-aiops init`` — a friendly, interactive onboarding wizard.
 
-Walks a new user through connecting their first network-fabric controller (Cisco
-Meraki today): collects the non-secret connection details into ``config.yaml``
-and the API key into the *encrypted* store (never plaintext on disk). Designed to
-be run on a terminal; everything it needs is prompted with sensible defaults.
+Walks a new user through connecting their first network-fabric controller —
+Cisco Meraki Dashboard, Cisco Catalyst Center, or Arista CloudVision Portal
+(the registered platforms): collects the non-secret connection details into
+``config.yaml`` and the platform secret (Meraki API key / Catalyst Center
+``username:password`` / CVP service-account token) into the *encrypted* store
+(never plaintext on disk). Designed to be run on a terminal; everything it
+needs is prompted with sensible defaults.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import yaml
 from fabric_aiops.cli._common import cli_errors, console
 from fabric_aiops.config import CONFIG_DIR, CONFIG_FILE
 from fabric_aiops.governance.paths import ops_path
-from fabric_aiops.platform import DEFAULT_MERAKI_BASE_URL, MERAKI
+from fabric_aiops.platform import MERAKI, Platform, get_platform, platform_names
 from fabric_aiops.secretstore import SecretStore, resolve_master_password
 
 # Starter policy: keeps the secure-by-default gate (high/critical writes need a
@@ -72,13 +75,44 @@ def _write_targets(targets: list[dict]) -> None:
     CONFIG_FILE.write_text(yaml.safe_dump({"targets": targets}, sort_keys=False), "utf-8")
 
 
+def _prompt_platform() -> Platform:
+    """Ask which registered controller platform this target speaks."""
+    names = platform_names()
+    console.print(f"[dim]Registered platforms: {', '.join(names)}[/]")
+    while True:
+        choice = typer.prompt("Platform", default=MERAKI).strip().lower()
+        if choice in names:
+            return get_platform(choice)
+        console.print(f"[red]Unknown platform '{choice}'. Choose one of: {', '.join(names)}[/]")
+
+
+def _prompt_base_url(platform: Platform) -> str:
+    """Base URL: platform default when it has one, else required (on-prem)."""
+    if platform.default_base_url:
+        return typer.prompt(
+            "API base URL (blank = default)", default=platform.default_base_url
+        ).strip()
+    console.print(
+        f"[dim]{platform.label} is per-install — enter your controller's URL "
+        f"(default port {platform.default_port}, HTTPS).[/]"
+    )
+    while True:
+        base_url = typer.prompt(f"Controller base URL (e.g. https://<{platform.name}-host>)")
+        base_url = base_url.strip().rstrip("/")
+        if base_url and "://" not in base_url:
+            base_url = f"https://{base_url}"
+        if base_url:
+            return base_url
+        console.print("[red]A base URL is required for this platform.[/]")
+
+
 @cli_errors
 def init_cmd() -> None:
-    """Interactively set up your first Meraki connection."""
+    """Interactively set up your first controller connection."""
     console.print("[bold cyan]Fabric AIops — setup wizard[/]")
     console.print(
         "This collects connection details (saved to config.yaml) and your "
-        "Meraki API key (saved [bold]encrypted[/] to secrets.enc).\n"
+        "controller secret (saved [bold]encrypted[/] to secrets.enc).\n"
     )
 
     console.print("[bold]Step 1 — master password[/]")
@@ -100,22 +134,20 @@ def init_cmd() -> None:
                 continue
             targets = [t for t in targets if t.get("name") != name]
 
-        base_url = typer.prompt(
-            "API base URL (blank = default)", default=DEFAULT_MERAKI_BASE_URL
+        platform = _prompt_platform()
+        base_url = _prompt_base_url(platform)
+        org_id = typer.prompt(
+            f"Default {platform.org_id_hint} (optional)", default=""
         ).strip()
-        org_id = typer.prompt("Default organization id (optional)", default="").strip()
         console.print("[dim]Lab / self-signed controller setups can answer No here.[/]")
         verify_ssl = typer.confirm("Verify TLS certificate?", default=True)
 
-        console.print(
-            "[dim]Create an API key in the Meraki Dashboard: Organization → "
-            "Settings → API access → Generate. Paste it below (input hidden).[/]"
-        )
-        secret = getpass.getpass(f"API key for '{name}' (hidden): ")
+        console.print(f"[dim]{platform.secret_help} Paste it below (input hidden).[/]")
+        secret = getpass.getpass(f"{platform.secret_hint} for '{name}' (hidden): ")
         store = store.set(name, secret)
 
-        entry: dict = {"name": name, "platform": MERAKI}
-        if base_url and base_url != DEFAULT_MERAKI_BASE_URL:
+        entry: dict = {"name": name, "platform": platform.name}
+        if base_url and base_url != platform.default_base_url:
             entry["base_url"] = base_url
         if org_id:
             entry["org_id"] = org_id
@@ -124,7 +156,7 @@ def init_cmd() -> None:
         targets.append(entry)
         existing_names.add(name)
         _write_targets(targets)
-        console.print(f"[green]✓ Saved target '{name}' (API key stored encrypted).[/]")
+        console.print(f"[green]✓ Saved target '{name}' (secret stored encrypted).[/]")
 
         if not typer.confirm("\nAdd another target?", default=False):
             break

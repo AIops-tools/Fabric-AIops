@@ -1,17 +1,24 @@
-"""Connection management for network-fabric controllers (Cisco Meraki today).
+"""Connection management for network-fabric controllers.
 
-Thin httpx wrapper with per-target session reuse and static API-key auth:
+Thin httpx wrapper with per-target session reuse and two auth flows, selected
+by the target's :class:`~fabric_aiops.platform.Platform` descriptor:
 
-  * The controller issues a long-lived **API key** (Meraki: Dashboard →
-    Organization → Settings → API access). Every request carries it in the auth
-    header the target's :class:`~fabric_aiops.platform.Platform` builds —
-    ``Authorization: Bearer <apiKey>`` by default, or the legacy
-    ``X-Cisco-Meraki-API-Key`` header (``auth_style: meraki-key``).
-  * ``api_base`` already includes the API version path
-    (``https://api.meraki.com/api/v1``), so callers pass resource paths like
-    ``/organizations`` or ``/networks/{id}/devices``.
-  * List endpoints paginate via a ``Link`` header + ``perPage``/``startingAfter``;
-    :meth:`FabricConnection.get_pages` follows ``rel=next`` and aggregates.
+  * **static** (Meraki, CVP) — a long-lived secret (Meraki API key or
+    CloudVision service-account token) is carried on every request in the
+    header the platform builds — ``Authorization: Bearer <secret>`` by
+    default, or Meraki's legacy ``X-Cisco-Meraki-API-Key`` header
+    (``auth_style: meraki-key``).
+  * **session-token** (Catalyst Center) — the stored ``username:password``
+    secret is exchanged (HTTP Basic) at the platform's ``token_path`` for a
+    short-lived token (~1 h) attached per request as ``X-Auth-Token``; on a
+    401 the token is refreshed once and the request retried.
+
+``api_base`` comes from the target (Meraki's includes the version path,
+``https://api.meraki.com/api/v1``; Catalyst Center / CVP targets point at the
+controller host and the platform's path templates carry the full API paths).
+Meraki list endpoints paginate via a ``Link`` header + ``perPage``/
+``startingAfter``; :meth:`FabricConnection.get_pages` follows ``rel=next`` and
+aggregates. Catalyst Center / CVP list endpoints return one bounded page.
 
 All non-2xx responses are translated centrally into ``FabricApiError`` with a
 teaching message — HTTP errors are translated at the connection layer rather
@@ -24,6 +31,7 @@ The httpx client is injectable for tests: pass ``client=`` to
 from __future__ import annotations
 
 import atexit
+import base64
 import logging
 import weakref
 from typing import Any
@@ -31,7 +39,7 @@ from typing import Any
 import httpx
 
 from fabric_aiops.config import AppConfig, TargetConfig, load_config
-from fabric_aiops.platform import parse_next_link
+from fabric_aiops.platform import AUTH_FLOW_SESSION, parse_next_link
 
 _log = logging.getLogger("fabric-aiops.connection")
 
@@ -72,8 +80,8 @@ def _teaching_message(status: int, path: str, body: str, label: str) -> str:
     if status in (401, 403):
         return (
             f"Authentication/authorization failed ({status}) on {label} {path}. "
-            f"Check the API key (Dashboard → Organization → Settings → API access) "
-            f"and that the key's admin has access to this organization. {snippet}"
+            f"Check the stored credential ('fabric-aiops secret set <target>') and "
+            f"that it has access/privileges on this controller. {snippet}"
         )
     if status == 404:
         return (
@@ -82,8 +90,8 @@ def _teaching_message(status: int, path: str, body: str, label: str) -> str:
         )
     if status == 429:
         return (
-            f"Rate limited (429) on {label} {path}. The Dashboard API caps requests "
-            f"per organization; back off and retry after the Retry-After delay. {snippet}"
+            f"Rate limited (429) on {label} {path}. The controller API rate-limits "
+            f"requests; back off and retry after the Retry-After delay. {snippet}"
         )
     if status in (400, 422):
         return (
@@ -103,25 +111,106 @@ class FabricConnection:
 
     def __init__(self, target: TargetConfig, client: Any | None = None) -> None:
         self._target = target
+        self._session_token: str | None = None
         platform = target.platform_obj
+        if platform.auth_flow == AUTH_FLOW_SESSION:
+            # The secret is exchanged lazily for a short-lived token — nothing
+            # secret goes into the base headers at construction time.
+            headers = platform.auth_headers("", target.auth_style)
+        else:
+            headers = platform.auth_headers(target.api_key, target.auth_style)
         self._client = client or httpx.Client(
             base_url=target.api_base,
             verify=target.verify_ssl,
             timeout=_TIMEOUT,
-            headers=platform.auth_headers(target.api_key, target.auth_style),
+            headers=headers,
         )
 
     @property
     def target(self) -> TargetConfig:
         return self._target
 
-    def _raw_request(self, method: str, path: str, **kwargs: Any) -> Any:
-        """Issue a request and return the raw response, translating transport errors."""
+    # ── session-token flow (Catalyst Center) ────────────────────────────────
+    def _fetch_session_token(self) -> str:
+        """Exchange the stored ``username:password`` secret for a session token."""
+        platform = self._target.platform_obj
+        secret = self._target.api_key
+        if ":" not in secret:
+            raise FabricApiError(
+                f"The {platform.label} secret must be 'username:password' (it is "
+                f"exchanged for a short-lived token via POST {platform.token_path}). "
+                f"Re-store it with 'fabric-aiops secret set {self._target.name}'.",
+                path=platform.token_path,
+            )
+        basic = base64.b64encode(secret.encode("utf-8")).decode("ascii")
         try:
-            return self._client.request(method, path, **kwargs)
+            resp = self._client.request(
+                "POST",
+                platform.token_path,
+                headers={"Authorization": f"Basic {basic}"},
+            )
         except httpx.HTTPError as exc:
             raise FabricApiError(
-                f"Could not reach {self._target.platform_obj.label} at "
+                f"Could not reach {platform.label} at {self._target.api_base} for a "
+                f"session token (POST {platform.token_path}): {exc}. Check the base "
+                f"URL and that the controller REST API is reachable.",
+                path=platform.token_path,
+            ) from exc
+        if not (200 <= resp.status_code < 300):
+            raise FabricApiError(
+                f"Session-token request failed ({resp.status_code}) on {platform.label} "
+                f"{platform.token_path}. Check the 'username:password' secret "
+                f"('fabric-aiops secret set {self._target.name}') and the account's "
+                f"role. {resp.text[:200].strip()}",
+                status_code=resp.status_code,
+                path=platform.token_path,
+            )
+        body = self._parse(resp)
+        token = body.get("Token") or body.get("token") if isinstance(body, dict) else None
+        if not token:
+            raise FabricApiError(
+                f"{platform.label} token response carried no 'Token' field "
+                f"(POST {platform.token_path}) — is the base URL pointing at the "
+                f"controller, not a proxy login page?",
+                path=platform.token_path,
+            )
+        return str(token)
+
+    def _ensure_session_token(self) -> str:
+        if self._session_token is None:
+            self._session_token = self._fetch_session_token()
+        return self._session_token
+
+    def _session_request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Issue a token-authenticated request, refreshing once on a 401.
+
+        Session tokens expire (~1 h on Catalyst Center); a 401 mid-session is
+        treated as expiry — the token is dropped, re-fetched once, and the
+        request retried. A second 401 surfaces via the normal error path.
+        """
+        platform = self._target.platform_obj
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers[platform.token_header] = self._ensure_session_token()
+        resp = self._client.request(method, path, headers=headers, **kwargs)
+        if getattr(resp, "status_code", None) == 401:
+            self._session_token = None
+            headers[platform.token_header] = self._ensure_session_token()
+            resp = self._client.request(method, path, headers=headers, **kwargs)
+        return resp
+
+    # ── request core ─────────────────────────────────────────────────────────
+    def _raw_request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Issue a request and return the raw response, translating transport errors."""
+        platform = self._target.platform_obj
+        try:
+            if platform.auth_flow == AUTH_FLOW_SESSION:
+                return self._session_request(method, path, **kwargs)
+            return self._client.request(method, path, **kwargs)
+        except FabricApiError:
+            raise
+        except httpx.HTTPError as exc:
+            raise FabricApiError(
+                f"Could not reach {platform.label} at "
                 f"{self._target.api_base} ({method} {path}): {exc}. Check the base "
                 f"URL and that the controller REST API is reachable.",
                 path=path,
@@ -170,7 +259,9 @@ class FabricConnection:
         Aggregates every page's array (Meraki list endpoints return bare JSON
         arrays) up to ``max_pages`` so a runaway pagination loop is bounded. The
         first request uses ``path``+``params``; subsequent requests follow the
-        absolute ``next`` URL the controller returns.
+        absolute ``next`` URL the controller returns. Platforms without Link
+        pagination (Catalyst Center, CVP) return their single — possibly
+        enveloped — page as a one-item list; the platform adapter unwraps it.
         """
         results: list = []
         next_target: str = path

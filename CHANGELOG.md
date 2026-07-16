@@ -1,5 +1,70 @@
 # Changelog
 
+## v0.3.0 — 2026-07-16
+
+### Fixed
+- **`secrets.enc` now follows `FABRIC_AIOPS_HOME`** (secretstore hardcoded the real
+  home directory; config/audit/undo already relocated — found in live verification).
+- **Audit fidelity**: failures sanitized into `{"error": ...}` results by the MCP error
+  layer are now audited as `status=error` (they previously read as `ok`, hiding failed
+  attempts from exception reports), and no undo is recorded for a call that failed.
+- **New controller platforms: Cisco Catalyst Center and Arista CloudVision Portal (CVP)** alongside Meraki — one tool, platform registry; unsupported ops fail fast with a teaching error (see the support matrix in README).
+- Catalyst token auth with automatic refresh-on-401.
+- Undo replay fix: `remove_device_from_network` now accepts a `serials` list, so `claim_devices_into_network`'s undo descriptor is replayable.
+
+### Tests
+- `doctor` and the `init` wizard are now fully covered (previously ~10–20%); plus a
+  regression test for the sanitized-failure audit status.
+
+## (merged into v0.3.0)
+
+### Added
+
+- **Two new controller platforms** alongside Meraki, per the platform-registry
+  architecture (registry entries + request/response adaptation — zero new
+  ops/CLI/MCP surface):
+  - **`catalyst` — Cisco Catalyst Center** (formerly DNA Center), read subset:
+    sites stand in for canonical organizations/networks (`/dna/intent/api/v1/site`,
+    `site-health`), device inventory + health (`network-device`, `device-health`),
+    issues → network alerts (P1→critical, P2→warning, P3/P4→info), per-device
+    interface stats → switch ports (by device uuid), and aggregate
+    `client-health` / per-MAC `client-detail` for clients. Auth is a short-lived
+    (~1 h) session token: the stored secret is `username:password`, exchanged via
+    `POST /dna/system/api/v1/auth/token` (HTTP Basic) for an `X-Auth-Token`
+    that is auto-refreshed once on a 401 and the request retried.
+  - **`cvp` — Arista CloudVision Portal**, read subset: containers stand in for
+    canonical organizations/networks (`/cvpservice/inventory/containers`,
+    `getContainerInfoById.do`), device inventory with the
+    `complianceCode`/`complianceIndication` config-drift signal
+    (`/cvpservice/inventory/devices`), events → network alerts
+    (`getAllEvents.do`), users → org admins. Auth is a service-account token
+    (`Authorization: Bearer`).
+- **Canonical-op layer**: `Platform` descriptors now declare per-key
+  `PathSpec` path templates (all interpolated segments percent-encoded through
+  the central `seg()` helper) plus response adapters; the ops layer resolves
+  canonical keys (`orgs.list`, `networks.alerts`, `devices.update`, ...)
+  through the target's platform. Ops a platform does not map raise a teaching
+  `PlatformUnsupported` ("not supported on X yet — open an issue or PR"),
+  never a silent no-op; **writes are Meraki-only today** and fail fast before
+  any controller call on catalyst/cvp.
+- `init` wizard gains a platform choice with per-platform base-URL, default
+  scope-id, and secret prompts; `doctor` probes each target with the canonical
+  top-of-hierarchy read (organizations / sites / containers) and reports the
+  platform's own vocabulary.
+- Tests: 70 new (catalyst session-token flow incl. refresh-on-401, path
+  building with hostile ids, response normalisation for every mapped canonical
+  key on both new platforms, unsupported-op/write teaching errors, cross-platform
+  doctor probe). 134 total.
+
+### Notes / known deferrals
+
+- Catalyst Center and CVP list endpoints are fetched as one bounded page (no
+  Link-header pagination on those platforms); deep pagination is deferred.
+- CVP configlet-content retrieval and compliance re-check triggers, and
+  Catalyst Center per-client listing, are deferred (would need new surface).
+- Both new platforms are **preview / mock-validated only** — modelled from the
+  public API shapes, not verified against a live controller.
+
 ## v0.2.0 — 2026-07-13
 
 Security-hardening release from a line-wide code review.

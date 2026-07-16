@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fabric-aiops"
-version = "0.2.0"
-description = "Governed AI-ops for Cisco Meraki network fabrics: uplink RCA, health scoring & config-drift with a built-in governance harness (audit, budget, undo, risk tiers)"
+version = "0.3.0"
+description = "Governed AI-ops for network-fabric controllers (Cisco Meraki, Cisco Catalyst Center, Arista CloudVision): uplink RCA, health scoring & config-drift with a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -56,5 +56,5 @@ select = ["E", "F", "I", "N", "W", "UP"]
 testpaths = ["tests"]
 markers = [
     "unit: Unit tests",
-    "integration: Integration tests (require a live Meraki organization)",
+    "integration: Integration tests (require a live controller: Meraki org, Catalyst Center, or CVP)",
 ]

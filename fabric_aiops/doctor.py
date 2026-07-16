@@ -54,10 +54,20 @@ def run_doctor(skip_auth: bool = False) -> int:
         problems += 1
 
     for target in config.targets:
+        platform = target.platform_obj
+        if not platform.requires_secret:
+            continue
         try:
             _ = target.api_key
-            _console.print(f"[green]✓ API key present for '{target.name}'[/]")
+            _console.print(
+                f"[green]✓ Secret present for '{target.name}' ({platform.secret_hint})[/]"
+            )
         except OSError as exc:
+            _console.print(f"[red]✗ {exc}[/]")
+            problems += 1
+        try:
+            _ = target.api_base
+        except ValueError as exc:  # on-prem platform without a base_url
             _console.print(f"[red]✗ {exc}[/]")
             problems += 1
 
@@ -66,16 +76,21 @@ def run_doctor(skip_auth: bool = False) -> int:
         return 1 if problems else 0
 
     from fabric_aiops.connection import ConnectionManager
+    from fabric_aiops.ops._util import op_get_pages
 
     mgr = ConnectionManager(config)
     for target in config.targets:
         try:
             conn = mgr.connect(target.name)
-            orgs = conn.get_pages("/organizations")
-            count = len(orgs) if isinstance(orgs, list) else 0
+            # 'orgs.list' is the canonical top-of-hierarchy probe on every
+            # platform (Meraki organizations / Catalyst Center sites / CVP
+            # containers) — it exercises auth (incl. the Catalyst Center
+            # session-token exchange) plus one real read.
+            rows = op_get_pages(conn, "orgs.list")
+            count = len(rows) if isinstance(rows, list) else 0
             _console.print(
                 f"[green]✓ Connected to '{target.name}' ({target.platform_obj.label}) "
-                f"— {count} organization(s) visible[/]"
+                f"— {count} {target.platform_obj.org_noun} visible[/]"
             )
         except Exception as exc:  # noqa: BLE001 — connectivity is a status, not a crash
             _console.print(f"[red]✗ Connect to '{target.name}' failed: {exc}[/]")

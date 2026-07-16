@@ -6,11 +6,17 @@ from fabric_aiops.config import TargetConfig
 from fabric_aiops.connection import FabricApiError, FabricConnection
 from fabric_aiops.platform import (
     AUTH_MERAKI_KEY,
+    CANONICAL_OPS,
+    CANONICAL_WRITES,
+    CATALYST,
+    CVP,
     DEFAULT_MERAKI_BASE_URL,
     MERAKI,
+    PlatformUnsupported,
     get_platform,
     parse_next_link,
     platform_names,
+    platforms_supporting,
     seg,
 )
 
@@ -24,9 +30,100 @@ def test_meraki_is_registered_and_default():
 
 
 @pytest.mark.unit
+def test_three_platforms_registered():
+    assert set(platform_names()) == {MERAKI, CATALYST, CVP}
+
+
+@pytest.mark.unit
+def test_meraki_is_the_reference_platform_covering_every_canonical_op():
+    p = get_platform(MERAKI)
+    missing = [key for key in CANONICAL_OPS if not p.supports(key)]
+    assert missing == []
+
+
+@pytest.mark.unit
+def test_writes_are_meraki_only_today():
+    for key in CANONICAL_WRITES:
+        assert platforms_supporting(key) == (MERAKI,)
+
+
+@pytest.mark.unit
+def test_meraki_request_for_builds_encoded_paths_and_passes_params_through():
+    p = get_platform(MERAKI)
+    path, query = p.request_for("orgs.get", {"org_id": "../evil"})
+    assert path == "/organizations/..%2Fevil" and query == {}
+    path, query = p.request_for(
+        "clients.list", {"network_id": "N 1"}, {"timespan": 7200}
+    )
+    assert path == "/networks/N%201/clients"
+    assert query == {"timespan": 7200}  # reference platform: passthrough
+
+
+@pytest.mark.unit
+def test_request_for_missing_required_id_teaches():
+    with pytest.raises(ValueError, match="requires: org_id"):
+        get_platform(MERAKI).request_for("orgs.get", {})
+
+
+@pytest.mark.unit
+def test_request_for_unknown_key_raises_platform_unsupported():
+    with pytest.raises(PlatformUnsupported, match="issue or PR"):
+        get_platform(MERAKI).request_for("nonsense.op", {})
+
+
+@pytest.mark.unit
 def test_unknown_platform_raises_with_registered_names():
     with pytest.raises(ValueError, match="meraki"):
         get_platform("catalyst-center")
+
+
+@pytest.mark.unit
+def test_doctor_connectivity_uses_canonical_org_probe_per_platform(monkeypatch, tmp_path, capsys):
+    """doctor's connectivity probe is canonical: a catalyst target reports
+    sites, a cvp target reports containers (no Meraki path hardcoded)."""
+    import fabric_aiops.connection as conn_mod
+    import fabric_aiops.doctor as doctor_mod
+    from fabric_aiops.config import AppConfig
+
+    targets = (
+        TargetConfig(name="cc", platform=CATALYST, base_url="https://cc.example.com"),
+        TargetConfig(name="cv", platform=CVP, base_url="https://cvp.example.com"),
+    )
+
+    class _FakeConn:
+        def __init__(self, target):
+            self.target = target
+
+        def get_pages(self, path, params=None, **_kw):
+            if self.target.platform == CATALYST:
+                assert path == "/dna/intent/api/v1/site"
+                return [{"response": [{"id": "s1", "name": "HQ"}]}]
+            assert path == "/cvpservice/inventory/containers"
+            return [{"key": "root", "name": "Tenant"}]
+
+    class _FakeManager:
+        def __init__(self, config):
+            self._config = config
+
+        def connect(self, name):
+            return _FakeConn(self._config.get_target(name))
+
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("targets: []", "utf-8")
+    monkeypatch.setenv("FABRIC_CC_APIKEY", "admin:pw")
+    monkeypatch.setenv("FABRIC_CV_APIKEY", "svc-token")
+    env_file = tmp_path / ".env"  # legacy-store branch: warns, not a failure
+    env_file.write_text("", "utf-8")
+    monkeypatch.setattr(doctor_mod, "CONFIG_FILE", cfg_file)
+    monkeypatch.setattr(doctor_mod, "ENV_FILE", env_file)
+    monkeypatch.setattr(doctor_mod, "load_config", lambda: AppConfig(targets=targets))
+    monkeypatch.setattr(doctor_mod, "has_store", lambda: False)
+    monkeypatch.setattr("fabric_aiops.config.has_store", lambda: False)
+    monkeypatch.setattr(conn_mod, "ConnectionManager", _FakeManager)
+
+    assert doctor_mod.run_doctor() == 0
+    out = capsys.readouterr().out
+    assert "sites" in out and "containers" in out
 
 
 @pytest.mark.unit

@@ -1,10 +1,10 @@
 ---
 name: fabric-aiops
 description: >
-  Use this skill whenever the user needs to operate a Cisco Meraki network fabric through the Dashboard API — a one-shot fabric health overview; organization reads (list/get, licensing, admins, org-wide device statuses, API usage); network reads (list/get, VLANs, health alerts, traffic); device reads (inventory by model MX/MS/MR/MV/MG, status, uplinks, switch ports, wireless SSIDs); client reads (list, detail, usage, connectivity); three flagship analyses — uplink loss & latency RCA (rank worst MX WAN uplinks + cause/action), network health score (composite per-network), and config template drift (settings drifted from a bound template); and eight guarded writes (reboot, blink LEDs, update device, update VLAN, claim/remove devices, bind/unbind a config template).
-  Always use this skill for "Meraki org overview", "which uplinks are worst", "uplink loss and latency", "WAN degradation RCA", "network health score", "config template drift", "list Meraki networks/devices/clients", "reboot a Meraki device", "blink device LEDs", "claim a device into a network", "bind a network to a template" when the context is a Cisco Meraki Dashboard fabric.
+  Use this skill whenever the user needs to operate a network fabric through a controller API — Cisco Meraki Dashboard (full read+write), Cisco Catalyst Center / DNA Center (read subset), or Arista CloudVision Portal / CVP (read subset) — a one-shot fabric health overview; organization/site/container reads (list/get, licensing, admins, org-wide device statuses, API usage); network reads (list/get, VLANs, health alerts, traffic); device reads (inventory by model MX/MS/MR/MV/MG, status, uplinks, switch ports / interface stats, wireless SSIDs); client reads (list, detail, usage, connectivity); three flagship analyses — uplink loss & latency RCA (rank worst MX WAN uplinks + cause/action), network health score (composite per-network), and config template drift (settings drifted from a bound template); and eight guarded writes (reboot, blink LEDs, update device, update VLAN, claim/remove devices, bind/unbind a config template — Meraki-only; on catalyst/cvp writes return a teaching "not supported yet" error).
+  Always use this skill for "Meraki org overview", "which uplinks are worst", "uplink loss and latency", "WAN degradation RCA", "network health score", "config template drift", "list Meraki networks/devices/clients", "reboot a Meraki device", "blink device LEDs", "claim a device into a network", "bind a network to a template", "Catalyst Center site health / device health / issues", "DNA Center inventory", "CloudVision inventory / compliance / events" when the context is a controller-managed network fabric.
   Do NOT use when the target is OT / industrial equipment (Modbus, OPC-UA, PLCs — use industrial-aiops), a hypervisor, a storage appliance, a backup product, a container/cluster orchestrator, or device-level CLI/SSH network automation (negative routing hints only).
-  Preview — common Cisco Meraki fabric operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). Mock-validated only, not verified against a live Meraki organization.
+  Preview — common controller fabric operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). Mock-validated only, not verified against a live controller of any platform.
 installer:
   kind: uv
   package: fabric-aiops
@@ -13,9 +13,9 @@ allowed-tools:
   - Bash
 metadata: {"openclaw":{"requires":{"env":["FABRIC_AIOPS_CONFIG"],"bins":["fabric-aiops"],"config":["~/.fabric-aiops/config.yaml","~/.fabric-aiops/secrets.enc"]},"optional":{"env":["FABRIC_AIOPS_MASTER_PASSWORD"]},"primaryEnv":"FABRIC_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/Fabric-AIops","emoji":"🛰️","os":["macos","linux"]}}
 compatibility: >
-  Standalone, self-governed Cisco Meraki network-fabric operations (preview). The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry); only Meraki is registered in v0.1.
+  Standalone, self-governed network-fabric controller operations (preview). The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry): meraki (Cisco Meraki Dashboard, reference platform, full read+write), catalyst (Cisco Catalyst Center, read subset — sites stand in for organizations/networks), and cvp (Arista CloudVision Portal, read subset — containers stand in for organizations/networks). Unmapped ops raise a teaching "not supported on <platform> yet" error; all writes are Meraki-only today.
   All write operations are audited to a local SQLite DB under ~/.fabric-aiops/ (relocatable via FABRIC_AIOPS_HOME).
-  Credentials: the Meraki API key is stored ENCRYPTED in ~/.fabric-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'fabric-aiops init' to onboard, or 'fabric-aiops secret set <target>' to add one. The store is unlocked by a master password from FABRIC_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var FABRIC_<TARGET_NAME_UPPER>_APIKEY is still honoured as a fallback with a deprecation warning (migrate with 'fabric-aiops secret migrate'). The API key is sent in the platform auth header (Authorization: Bearer, or X-Cisco-Meraki-API-Key) at request time and held only in memory; keys are never logged or echoed.
+  Credentials: the controller secret (Meraki API key / Catalyst Center username:password / CVP service-account token) is stored ENCRYPTED in ~/.fabric-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'fabric-aiops init' to onboard, or 'fabric-aiops secret set <target>' to add one. The store is unlocked by a master password from FABRIC_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var FABRIC_<TARGET_NAME_UPPER>_APIKEY is still honoured as a fallback with a deprecation warning (migrate with 'fabric-aiops secret migrate'). Meraki/CVP secrets ride the platform auth header (Authorization: Bearer, or X-Cisco-Meraki-API-Key) at request time; the Catalyst Center secret is exchanged via POST /dna/system/api/v1/auth/token for a short-lived X-Auth-Token (auto-refreshed once on 401). Secrets are held only in memory and never logged or echoed.
   State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate) and take a dry_run preview. Mutating/reversible writes fetch the real before-state first and record a faithful inverse undo descriptor; irreversible ops (reboot, blink) record only the before-state.
   Webhooks: none — no outbound network calls beyond the configured controller REST API base URL.
   SSL: verify_ssl defaults to true; disable only for a self-signed on-prem controller proxy.
@@ -25,11 +25,21 @@ compatibility: >
 
 # Fabric AIops (preview)
 
-> **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
+> **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
 
-Governed Cisco Meraki network-fabric operations — **32 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The Meraki API key is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed network-fabric controller operations — **32 MCP tools** over **three platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
-> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. **Preview / mock-only**: not yet validated against a live Meraki organization.
+> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. **Preview / mock-only**: not yet validated against a live controller of any platform.
+
+## Platform support
+
+| Platform | `platform:` | Coverage | Auth |
+|----------|-------------|----------|------|
+| Cisco Meraki Dashboard | `meraki` | full (all reads + all 8 writes) | API key (Bearer / X-Cisco-Meraki-API-Key) |
+| Cisco Catalyst Center | `catalyst` | read subset: sites (as orgs/networks), device+site+client health, issues→alerts, inventory, interface stats | `username:password` → short-lived X-Auth-Token (auto-refresh on 401) |
+| Arista CloudVision Portal | `cvp` | read subset: containers (as orgs/networks), inventory (+ complianceCode drift signal), events→alerts, users→admins | service-account token (Bearer) |
+
+Ops a platform does not map — and **every write on catalyst/cvp** — return a teaching "not supported on `<platform>` yet — open an issue or PR" error, never a silent no-op. Full matrix in the repo README.
 
 ## What This Skill Does
 
@@ -51,7 +61,7 @@ Governed Cisco Meraki network-fabric operations — **32 MCP tools**, every one 
 
 ```bash
 uv tool install fabric-aiops
-fabric-aiops init       # interactive wizard: connection + encrypted Meraki API key
+fabric-aiops init       # interactive wizard: platform choice (meraki/catalyst/cvp) + encrypted secret
 fabric-aiops doctor
 ```
 
@@ -70,6 +80,8 @@ fabric-aiops doctor
 | If the user wants… | Use |
 |--------------------|-----|
 | Cisco Meraki fabric: uplinks, health, config templates, device lifecycle | **fabric-aiops** (this skill) |
+| Cisco Catalyst Center (DNA Center): site/device/client health, issues, inventory | **fabric-aiops** (this skill, `platform: catalyst`) |
+| Arista CloudVision Portal: inventory, compliance drift signal, events | **fabric-aiops** (this skill, `platform: cvp`) |
 | OT / industrial edge (Modbus, OPC-UA, PLC, PROFINET) | the **industrial-aiops** line |
 | Hypervisor VM lifecycle (power, snapshot, migrate) | a hypervisor ops skill |
 | Container/cluster lifecycle | a cluster ops skill |

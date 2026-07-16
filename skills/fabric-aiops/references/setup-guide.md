@@ -1,7 +1,9 @@
 # fabric-aiops setup & security guide
 
-> Preview / mock-only — not yet validated against a live Meraki organization.
-> Community-maintained; not affiliated with or endorsed by Cisco/Meraki.
+> Preview / mock-only — not yet validated against a live controller of any
+> platform (Meraki organization, Catalyst Center appliance, or CloudVision
+> Portal instance). Community-maintained; not affiliated with or endorsed by
+> Cisco/Meraki/Arista.
 
 ## 1. Install
 
@@ -9,12 +11,25 @@
 uv tool install fabric-aiops
 ```
 
-## 2. Create a Meraki API key
+## 2. Create the platform credential
 
-In the Cisco Meraki Dashboard: **Organization → Settings → API access →
-Generate API key**. Copy the key. fabric-aiops sends it as `Authorization:
-Bearer <key>` (or, with `auth_style: meraki-key`, `X-Cisco-Meraki-API-Key`)
-against the Dashboard API base `https://api.meraki.com/api/v1`.
+**Cisco Meraki Dashboard (`platform: meraki`)** — in the Dashboard:
+**Organization → Settings → API access → Generate API key**. Copy the key.
+fabric-aiops sends it as `Authorization: Bearer <key>` (or, with
+`auth_style: meraki-key`, `X-Cisco-Meraki-API-Key`) against the Dashboard API
+base `https://api.meraki.com/api/v1`.
+
+**Cisco Catalyst Center (`platform: catalyst`)** — use a Catalyst Center
+account (a read-only role suffices for the current read subset) and store the
+secret as a single `username:password` string. fabric-aiops exchanges it via
+`POST /dna/system/api/v1/auth/token` (HTTP Basic) for a short-lived (~1 h)
+`X-Auth-Token`, attached per request and auto-refreshed once on a 401. A
+`base_url` is required (`https://<catalyst-center-host>`).
+
+**Arista CloudVision Portal (`platform: cvp`)** — create a service-account
+token in CloudVision: **Settings → Access Control → Service Accounts**.
+fabric-aiops sends it as `Authorization: Bearer <token>`. A `base_url` is
+required (`https://<cvp-host>`).
 
 ## 3. Onboard
 
@@ -22,9 +37,9 @@ against the Dashboard API base `https://api.meraki.com/api/v1`.
 fabric-aiops init
 ```
 
-The wizard collects (non-secret) connection details into
-`~/.fabric-aiops/config.yaml` and stores the API key **encrypted** into
-`~/.fabric-aiops/secrets.enc`. Example config:
+The wizard asks for the platform (`meraki` / `catalyst` / `cvp`), collects
+(non-secret) connection details into `~/.fabric-aiops/config.yaml`, and stores
+the secret **encrypted** into `~/.fabric-aiops/secrets.enc`. Example config:
 
 ```yaml
 targets:
@@ -34,6 +49,15 @@ targets:
     verify_ssl: true
     # base_url: https://api.meraki.eu/api/v1   # override only for a region/proxy
     # auth_style: meraki-key                    # use X-Cisco-Meraki-API-Key instead of Bearer
+  - name: campus
+    platform: catalyst
+    base_url: https://catalyst.example.com     # required (per-install)
+    org_id: "site-uuid"          # default site id (optional)
+    # verify_ssl: false          # only for self-signed lab controllers
+  - name: dc-fabric
+    platform: cvp
+    base_url: https://cvp.example.com          # required (per-install)
+    org_id: "root"               # default container key (optional)
 ```
 
 ## 4. Non-interactive use (MCP server / CI / cron)
@@ -47,7 +71,8 @@ export FABRIC_AIOPS_MASTER_PASSWORD='your-master-password'
 
 ## Credential security
 
-- The API key is **never** written to disk in plaintext. It lives only in
+- The controller secret (Meraki API key / Catalyst Center `username:password`
+  / CVP service-account token) is **never** written to disk in plaintext. It lives only in
   `~/.fabric-aiops/secrets.enc`, encrypted with Fernet (AES-128-CBC + HMAC),
   the key derived from your master password via scrypt. Only a per-store random
   salt and the ciphertext are on disk (chmod 600); the master password itself is
@@ -77,6 +102,9 @@ State lives under `~/.fabric-aiops/` (relocate with `FABRIC_AIOPS_HOME`):
 fabric-aiops doctor
 ```
 
-`doctor` checks the config file, the encrypted store and its permissions, that an
-API key is present per target, and (unless `--skip-auth`) connectivity by listing
-`GET /organizations`.
+`doctor` checks the config file, the encrypted store and its permissions, that a
+secret (and, for on-prem platforms, a `base_url`) is present per target, and
+(unless `--skip-auth`) connectivity via the canonical top-of-hierarchy read —
+Meraki organizations, Catalyst Center sites, or CVP containers — which also
+exercises the platform's full auth flow (including the Catalyst Center
+session-token exchange).

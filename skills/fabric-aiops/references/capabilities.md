@@ -1,12 +1,28 @@
 # fabric-aiops capabilities
 
-> Preview / mock-only. 32 MCP tools (24 read, 8 write). Cisco Meraki Dashboard
-> API paths are modelled from the public API shape and need live verification.
-> Community-maintained; not affiliated with Cisco/Meraki.
+> Preview / mock-only. 32 MCP tools (24 read, 8 write) over three platforms —
+> Cisco Meraki Dashboard (reference, full read+write), Cisco Catalyst Center
+> (read subset), Arista CloudVision Portal (read subset). All API paths are
+> modelled from the public API shapes and need live verification.
+> Community-maintained; not affiliated with Cisco/Meraki/Arista.
 
 Meraki hierarchy: **organizations → networks → devices**. Device models carry a
 product-type prefix: **MX** appliance, **MS** switch, **MR** wireless AP, **MV**
 camera, **MG** cellular gateway.
+
+**Multi-platform**: the tables below show the reference (Meraki) API per tool.
+On `catalyst`, canonical organizations/networks are **sites**
+(`/dna/intent/api/v1/site`, `site-health`), device statuses come from
+`device-health`, alerts from `issues` (P1→critical, P2→warning), inventory from
+`network-device`, switch ports from per-device `interface` stats (pass the
+device uuid), and clients from `client-health` (aggregate) / `client-detail`
+(by MAC). On `cvp`, organizations/networks are **containers**
+(`/cvpservice/inventory/containers`), devices come from
+`/cvpservice/inventory/devices` (rows carry the `complianceCode` config-drift
+signal), alerts from `getAllEvents.do`, and admins from `getUsers.do`.
+Any tool a platform does not map — and **every write on catalyst/cvp** —
+returns a teaching "not supported on <platform> yet — open an issue or PR"
+error instead of a silent no-op. The full per-op matrix is in the repo README.
 
 ## Read tools (24)
 
@@ -80,5 +96,11 @@ are injected-only (they score data you already hold, e.g. from
 - OT / industrial equipment (use the `industrial-aiops` line) and device-level
   CLI/SSH network automation
 
-Want one of these, or another controller platform (Catalyst Center, Arista CVP)?
-Open an issue or PR — feedback and contributions welcome.
+- On **catalyst/cvp**: the unmapped reads in the matrix (licensing, VLANs,
+  traffic, uplink telemetry, ...), all writes, CVP configlet-content retrieval,
+  Catalyst Center per-client listing, and deep pagination
+
+Want one of these — a missing Meraki call, a ❌ filled in on Catalyst Center or
+CloudVision Portal (writes included), or another controller platform entirely?
+Open an issue or PR — feedback and contributions welcome (a platform is one
+descriptor module: path templates + response adapters).

@@ -1,10 +1,17 @@
-"""Shared helpers for the Meraki ops modules.
+"""Shared helpers for the ops modules.
+
+The ops layer speaks **canonical operations** (``orgs.list``,
+``networks.alerts``, ``devices.update``, ...). The ``op_get`` / ``op_get_pages``
+/ ``op_post`` / ``op_put`` helpers resolve each canonical key through the
+target's :class:`~fabric_aiops.platform.Platform` descriptor — path template
+(centrally percent-encoded), native query params, and the response adapter that
+folds the platform's payload into the canonical (Meraki) shape. A platform that
+does not map a key raises a teaching ``PlatformUnsupported``.
 
 Meraki Dashboard API list endpoints return a bare JSON array; a few wrap items
 under a key. ``as_list`` normalises both. All controller-returned text reaches
 the caller only after ``sanitize()`` (output hygiene: control/format characters
-stripped, bounded length), applied via the platform normaliser at the read
-boundary.
+stripped, bounded length), applied at the read boundary.
 """
 
 from __future__ import annotations
@@ -12,6 +19,58 @@ from __future__ import annotations
 from typing import Any
 
 from fabric_aiops.governance import sanitize
+from fabric_aiops.platform import MERAKI, Platform, get_platform
+
+
+def platform_of(conn: Any) -> Platform:
+    """The connection target's platform descriptor (reference platform when
+    the connection carries no real target — e.g. a bare test double)."""
+    platform = getattr(getattr(conn, "target", None), "platform_obj", None)
+    return platform if isinstance(platform, Platform) else get_platform(MERAKI)
+
+
+def require_support(conn: Any, *keys: str) -> None:
+    """Fail fast — BEFORE any controller call — when the target's platform
+    does not map one of the canonical ops (teaching ``PlatformUnsupported``)."""
+    platform_of(conn).require(*keys)
+
+
+def _request_kwargs(query: dict | None, json_body: Any = None) -> dict:
+    kwargs: dict = {}
+    if query:
+        kwargs["params"] = query
+    if json_body is not None:
+        kwargs["json"] = json_body
+    return kwargs
+
+
+def op_get(conn: Any, key: str, *, params: dict | None = None, **ids: Any) -> Any:
+    """GET one canonical resource; returns the adapted (canonical-shape) payload."""
+    platform = platform_of(conn)
+    path, query = platform.request_for(key, ids, params)
+    return platform.adapt(key, conn.get(path, **_request_kwargs(query)))
+
+
+def op_get_pages(conn: Any, key: str, *, params: dict | None = None, **ids: Any) -> list:
+    """GET a canonical list resource (paginated where the platform paginates)."""
+    platform = platform_of(conn)
+    path, query = platform.request_for(key, ids, params)
+    adapted = platform.adapt(key, conn.get_pages(path, params=query or None))
+    return adapted if isinstance(adapted, list) else [adapted]
+
+
+def op_post(conn: Any, key: str, *, json_body: Any = None, **ids: Any) -> Any:
+    """POST a canonical operation (write paths; guarded by the callers)."""
+    platform = platform_of(conn)
+    path, query = platform.request_for(key, ids)
+    return platform.adapt(key, conn.post(path, **_request_kwargs(query, json_body)))
+
+
+def op_put(conn: Any, key: str, *, json_body: Any = None, **ids: Any) -> Any:
+    """PUT a canonical operation (write paths; guarded by the callers)."""
+    platform = platform_of(conn)
+    path, query = platform.request_for(key, ids)
+    return platform.adapt(key, conn.put(path, **_request_kwargs(query, json_body)))
 
 
 def as_list(data: Any, list_key: str | None = None) -> list[dict]:

@@ -64,13 +64,14 @@ def _remove_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
     if not isinstance(result, dict):
         return None
     prior = result.get("priorState") or {}
-    if not prior.get("serial"):
+    serials = prior.get("serials") or ([prior["serial"]] if prior.get("serial") else [])
+    if not serials:
         return None
     return {
         "tool": "claim_devices_into_network",
-        "params": {"network_id": prior.get("networkId"), "serials": [prior.get("serial")]},
+        "params": {"network_id": prior.get("networkId"), "serials": serials},
         "skill": "fabric-aiops",
-        "note": "Inverse of remove: claim the device back into its prior network.",
+        "note": "Inverse of remove: claim the device(s) back into the prior network.",
     }
 
 
@@ -236,25 +237,41 @@ def claim_devices_into_network(
 @tool_errors("dict")
 def remove_device_from_network(
     network_id: str,
-    serial: str,
+    serial: Optional[str] = None,
+    serials: Optional[list[str]] = None,
     dry_run: bool = False,
     target: Optional[str] = None,
 ) -> dict:
-    """[WRITE][risk=high] Remove a device from a network. Inverse: claim it back.
+    """[WRITE][risk=high] Remove device(s) from a network. Inverse: claim back.
 
-    The device's current network is captured for undo (claim back). Pass
-    dry_run=True to preview.
+    The devices' current network is captured for undo (claim back). Pass
+    dry_run=True to preview. Accepts a single ``serial`` or a ``serials`` list —
+    the list form is how claim_devices_into_network's undo descriptor replays.
 
     Args:
-        network_id: Meraki network id the device is bound to.
-        serial: Device serial to remove.
+        network_id: Meraki network id the devices are bound to.
+        serial: One device serial to remove (or use ``serials``).
+        serials: Device serials to remove (mutually exclusive with ``serial``).
         dry_run: If True, preview without removing.
         target: Target name from config; omit for the default.
     """
+    if serial and serials:
+        raise ValueError("Pass either serial OR serials, not both.")
+    batch = [str(x) for x in (serials or ([serial] if serial else [])) if str(x).strip()]
+    if not batch:
+        raise ValueError("remove_device_from_network requires serial or serials.")
     conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldRemove": {"networkId": network_id, "serial": serial}}
-    return ops.remove_device_from_network(conn, network_id, serial)
+        return {"dryRun": True, "wouldRemove": {"networkId": network_id, "serials": batch}}
+    if len(batch) == 1:
+        return ops.remove_device_from_network(conn, network_id, batch[0])
+    removed = [ops.remove_device_from_network(conn, network_id, x) for x in batch]
+    return {
+        "action": "remove_device_from_network",
+        "networkId": network_id,
+        "removed": removed,
+        "priorState": {"networkId": network_id, "serials": batch},
+    }
 
 
 @mcp.tool()

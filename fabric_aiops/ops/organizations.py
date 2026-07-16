@@ -10,31 +10,37 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import as_list, clean, clean_list, require_org
-from fabric_aiops.platform import seg
+from fabric_aiops.ops._util import (
+    as_list,
+    clean,
+    clean_list,
+    op_get,
+    op_get_pages,
+    require_org,
+)
 
 
 def list_organizations(conn: Any) -> list[dict]:
     """[READ] Organizations visible to the API key."""
-    return clean_list(conn.get_pages("/organizations"))
+    return clean_list(op_get_pages(conn, "orgs.list"))
 
 
 def get_organization(conn: Any, org_id: str | None = None) -> dict:
     """[READ] One organization by id (name, url, api enabled, cloud region)."""
     oid = require_org(conn, org_id)
-    return clean(conn.get(f"/organizations/{seg(oid)}"))
+    return clean(op_get(conn, "orgs.get", org_id=oid))
 
 
 def licensing_overview(conn: Any, org_id: str | None = None) -> dict:
     """[READ] Org licensing overview: status, expiration, per-device-type counts."""
     oid = require_org(conn, org_id)
-    return clean(conn.get(f"/organizations/{seg(oid)}/licenses/overview"))
+    return clean(op_get(conn, "orgs.licensing", org_id=oid))
 
 
 def list_admins(conn: Any, org_id: str | None = None) -> list[dict]:
     """[READ] Dashboard administrators for the org (name, email, access level)."""
     oid = require_org(conn, org_id)
-    return clean_list(conn.get(f"/organizations/{seg(oid)}/admins"))
+    return clean_list(op_get(conn, "orgs.admins", org_id=oid))
 
 
 def device_statuses(conn: Any, org_id: str | None = None) -> dict:
@@ -46,7 +52,7 @@ def device_statuses(conn: Any, org_id: str | None = None) -> dict:
     per-device rows are returned too (bounded), so an agent can drill in.
     """
     oid = require_org(conn, org_id)
-    rows = clean_list(conn.get_pages(f"/organizations/{seg(oid)}/devices/statuses"))
+    rows = clean_list(op_get_pages(conn, "orgs.device_statuses", org_id=oid))
     by_status: dict[str, int] = {}
     by_product: dict[str, int] = {}
     for r in rows:
@@ -66,7 +72,7 @@ def device_statuses(conn: Any, org_id: str | None = None) -> dict:
 def api_request_usage(conn: Any, org_id: str | None = None) -> dict:
     """[READ] Org API-request usage overview (response-code counts) for rate insight."""
     oid = require_org(conn, org_id)
-    raw = conn.get(f"/organizations/{seg(oid)}/apiRequests/overview")
+    raw = op_get(conn, "orgs.api_requests", org_id=oid)
     data = clean(raw) if isinstance(raw, dict) else {}
     counts = data.get("responseCodeCounts") if isinstance(data, dict) else None
     codes = counts if isinstance(counts, dict) else {}

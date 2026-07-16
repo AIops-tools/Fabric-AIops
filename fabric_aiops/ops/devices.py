@@ -18,8 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import clean_list, require_org
-from fabric_aiops.platform import seg
+from fabric_aiops.ops._util import clean_list, op_get, op_get_pages, require_org
 
 # Recognised Meraki product-model prefixes.
 MODEL_PREFIXES = ("MX", "MS", "MR", "MV", "MG")
@@ -43,7 +42,7 @@ def inventory(conn: Any, org_id: str | None = None, model: str | None = None) ->
     the per-family counts and the (filtered) device rows.
     """
     oid = require_org(conn, org_id)
-    rows = clean_list(conn.get_pages(f"/organizations/{seg(oid)}/devices"))
+    rows = clean_list(op_get_pages(conn, "devices.list", org_id=oid))
     wanted = str(model).upper() if model else None
 
     by_model: dict[str, int] = {}
@@ -69,7 +68,7 @@ def device_status(conn: Any, serial: str, org_id: str | None = None) -> dict:
     """[READ] One device's availability status (from the org status feed)."""
     oid = require_org(conn, org_id)
     rows = clean_list(
-        conn.get_pages(f"/organizations/{seg(oid)}/devices/statuses", params={"serials[]": serial})
+        op_get_pages(conn, "orgs.device_statuses", params={"serials[]": serial}, org_id=oid)
     )
     for r in rows:
         if str(r.get("serial")) == str(serial):
@@ -81,14 +80,14 @@ def device_status(conn: Any, serial: str, org_id: str | None = None) -> dict:
 def uplink_status(conn: Any, org_id: str | None = None) -> list[dict]:
     """[READ] Appliance/gateway uplink statuses across the org (WAN interfaces)."""
     oid = require_org(conn, org_id)
-    return clean_list(conn.get_pages(f"/organizations/{seg(oid)}/uplinks/statuses"))
+    return clean_list(op_get_pages(conn, "devices.uplinks", org_id=oid))
 
 
 def switch_ports(conn: Any, serial: str) -> list[dict]:
     """[READ] Switch (MS) port configuration for a device by serial."""
-    return clean_list(conn.get(f"/devices/{seg(serial)}/switch/ports"))
+    return clean_list(op_get(conn, "devices.switch_ports", serial=serial))
 
 
 def wireless_ssids(conn: Any, network_id: str) -> list[dict]:
     """[READ] Wireless (MR) SSIDs configured on a network (number, name, enabled)."""
-    return clean_list(conn.get(f"/networks/{seg(network_id)}/wireless/ssids"))
+    return clean_list(op_get(conn, "devices.wireless_ssids", network_id=network_id))

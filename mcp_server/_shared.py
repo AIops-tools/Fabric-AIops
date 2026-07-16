@@ -76,7 +76,12 @@ mcp = FastMCP(
     "fabric-aiops",
     instructions=(
         "Governed network-fabric controller operations (preview) for the Cisco "
-        "Meraki Dashboard API: a one-shot fabric 'overview'; organization, "
+        "Meraki Dashboard API (full read+write), Cisco Catalyst Center (read "
+        "subset: sites stand in for organizations/networks), and Arista "
+        "CloudVision Portal (read subset: containers stand in for "
+        "organizations/networks) — ops not mapped on a platform return a "
+        "teaching 'not supported ... yet' error, and all writes are "
+        "Meraki-only today. Tools: a one-shot fabric 'overview'; organization, "
         "network, device and client reads; three flagship analyses — "
         "'uplink_loss_and_latency_rca' (rank worst MX WAN uplinks + cause/action), "
         "'network_health_score' (composite per-network health), and "

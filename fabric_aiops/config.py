@@ -1,9 +1,9 @@
 """Configuration management for Fabric AIops.
 
 Loads network-fabric controller connection targets from a YAML config file. Each
-target names its ``platform`` — currently only ``meraki`` (Cisco Meraki
-Dashboard API) is registered, but the field is the extension point for future
-controllers (Catalyst Center, Arista CVP). See :mod:`fabric_aiops.platform`.
+target names its ``platform`` — ``meraki`` (Cisco Meraki Dashboard API, the
+reference platform), ``catalyst`` (Cisco Catalyst Center), or ``cvp`` (Arista
+CloudVision Portal). See :mod:`fabric_aiops.platform` for what each supports.
 
 The secret (the controller **API key**) is NEVER stored in the config file and
 never on disk in plaintext: it lives in the encrypted store
@@ -72,11 +72,13 @@ def _resolve_secret(name: str) -> str:
 class TargetConfig:
     """A connection target for one network-fabric controller.
 
-    ``platform`` selects the controller family (``meraki`` today). ``base_url``
-    overrides the platform default (a Meraki region/self-hosted proxy); when
-    empty the platform's default is used. ``org_id`` is a convenience default
-    organization id so most commands need only ``--target``. The API key comes
-    from the encrypted secret store, never the config file.
+    ``platform`` selects the controller family (``meraki``, ``catalyst``,
+    ``cvp``). ``base_url`` overrides the platform default (a Meraki
+    region/self-hosted proxy) — and is *required* for on-prem controllers
+    (Catalyst Center, CVP) that have no cloud default. ``org_id`` is a
+    convenience default scope id (Meraki organization / Catalyst Center site /
+    CVP container key) so most commands need only ``--target``. The secret
+    comes from the encrypted store, never the config file.
     """
 
     name: str
@@ -100,8 +102,21 @@ class TargetConfig:
 
     @property
     def api_base(self) -> str:
-        """Effective API base URL: the override, else the platform default."""
-        return self.base_url or self.platform_obj.default_base_url
+        """Effective API base URL: the override, else the platform default.
+
+        Raises a teaching error for platforms with no cloud default (on-prem
+        controllers) when the target does not set ``base_url``.
+        """
+        platform = self.platform_obj
+        base = self.base_url or platform.default_base_url
+        if not base:
+            raise ValueError(
+                f"Target '{self.name}' ({platform.label}) has no API base URL — "
+                f"{platform.label} is per-install. Set 'base_url' (e.g. "
+                f"https://<controller-host>, default port {platform.default_port}) "
+                f"on the target in config.yaml, or re-run 'fabric-aiops init'."
+            )
+        return base
 
 
 @dataclass(frozen=True)

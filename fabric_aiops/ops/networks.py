@@ -10,24 +10,23 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import clean, clean_list, require_org
-from fabric_aiops.platform import seg
+from fabric_aiops.ops._util import clean, clean_list, op_get, op_get_pages, require_org
 
 
 def list_networks(conn: Any, org_id: str | None = None) -> list[dict]:
     """[READ] Networks in the organization (id, name, productTypes, tags)."""
     oid = require_org(conn, org_id)
-    return clean_list(conn.get_pages(f"/organizations/{seg(oid)}/networks"))
+    return clean_list(op_get_pages(conn, "networks.list", org_id=oid))
 
 
 def get_network(conn: Any, network_id: str) -> dict:
     """[READ] One network by id (name, product types, timezone, bound template)."""
-    return clean(conn.get(f"/networks/{seg(network_id)}"))
+    return clean(op_get(conn, "networks.get", network_id=network_id))
 
 
 def list_vlans(conn: Any, network_id: str) -> list[dict]:
     """[READ] Appliance VLANs configured on a network (id, subnet, appliance IP)."""
-    return clean_list(conn.get(f"/networks/{seg(network_id)}/appliance/vlans"))
+    return clean_list(op_get(conn, "networks.vlans", network_id=network_id))
 
 
 def network_alerts(conn: Any, network_id: str) -> dict:
@@ -37,7 +36,7 @@ def network_alerts(conn: Any, network_id: str) -> dict:
     severity (critical/warning/info) so an agent sees the blast radius before
     reading individual alerts. The raw alert rows are returned too (bounded).
     """
-    rows = clean_list(conn.get(f"/networks/{seg(network_id)}/health/alerts"))
+    rows = clean_list(op_get(conn, "networks.alerts", network_id=network_id))
     by_severity: dict[str, int] = {}
     for r in rows:
         sev = str(r.get("severity") or "unknown")
@@ -58,7 +57,9 @@ def traffic_summary(conn: Any, network_id: str, timespan: int = 86400) -> dict:
     parsing the whole series.
     """
     span = max(7200, min(int(timespan), 2592000))  # Meraki bounds: 2h .. 30d
-    rows = clean_list(conn.get(f"/networks/{seg(network_id)}/traffic", params={"timespan": span}))
+    rows = clean_list(
+        op_get(conn, "networks.traffic", params={"timespan": span}, network_id=network_id)
+    )
     ranked = []
     for r in rows:
         sent = r.get("sent") or 0
