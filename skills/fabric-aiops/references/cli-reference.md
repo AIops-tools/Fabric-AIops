@@ -1,13 +1,14 @@
 # fabric-aiops CLI reference
 
-> Preview / mock-only. Cisco Meraki Dashboard API paths are modelled from the
-> public API shape and need live verification. Not affiliated with Cisco/Meraki.
+> Preview / mock-only. Controller API paths (Meraki / Catalyst Center / CVP /
+> UniFi Network) are modelled from the public API shapes and need live
+> verification. Not affiliated with Cisco/Meraki/Arista/Ubiquiti.
 
 ## Setup & diagnostics
 
 ```bash
-fabric-aiops init                      # interactive onboarding wizard
-fabric-aiops doctor [--skip-auth]      # config + secret store + connectivity (GET /organizations)
+fabric-aiops init                      # interactive onboarding wizard (platform: meraki/catalyst/cvp/unifi)
+fabric-aiops doctor [--skip-auth]      # config + secret store + connectivity (canonical org/site/container probe)
 fabric-aiops mcp                       # start the MCP server (stdio transport)
 ```
 

@@ -1,10 +1,11 @@
 # fabric-aiops capabilities
 
-> Preview / mock-only. 32 MCP tools (24 read, 8 write) over three platforms —
+> Preview / mock-only. 32 MCP tools (24 read, 8 write) over four platforms —
 > Cisco Meraki Dashboard (reference, full read+write), Cisco Catalyst Center
-> (read subset), Arista CloudVision Portal (read subset). All API paths are
-> modelled from the public API shapes and need live verification.
-> Community-maintained; not affiliated with Cisco/Meraki/Arista.
+> (read subset), Arista CloudVision Portal (read subset), UniFi Network (read
+> subset + device restart). All API paths are modelled from the public API
+> shapes and need live verification. Community-maintained; not affiliated with
+> Cisco/Meraki/Arista/Ubiquiti.
 
 Meraki hierarchy: **organizations → networks → devices**. Device models carry a
 product-type prefix: **MX** appliance, **MS** switch, **MR** wireless AP, **MV**
@@ -20,9 +21,21 @@ device uuid), and clients from `client-health` (aggregate) / `client-detail`
 (`/cvpservice/inventory/containers`), devices come from
 `/cvpservice/inventory/devices` (rows carry the `complianceCode` config-drift
 signal), alerts from `getAllEvents.do`, and admins from `getUsers.do`.
-Any tool a platform does not map — and **every write on catalyst/cvp** —
-returns a teaching "not supported on <platform> yet — open an issue or PR"
-error instead of a silent no-op. The full per-op matrix is in the repo README.
+On `unifi`, organizations/networks are **sites** (`/api/self/sites`; the
+canonical id is the site's short name — the `/api/s/{site}/` path segment),
+device inventory/statuses come from `stat/device` (state 1 → online; uptime,
+firmware), switch ports from the device detail's `port_table` (pass the device
+**MAC** where Meraki takes a serial), clients from `stat/sta` / `stat/user`,
+alerts from `stat/alarm` (`*_Lost_Contact` → critical), `network_get` from
+`stat/health` (per-subsystem rollup), and `reboot_device` maps to
+`POST /api/s/{site}/cmd/devmgr {"cmd": "restart-device", "mac": ...}` — the
+only non-Meraki write. Device-scoped calls fill the site from the target's
+default `org_id`. Auth is a UniFi API key (`X-API-KEY`); a UniFi OS console's
+`base_url` carries the `/proxy/network` prefix.
+Any tool a platform does not map — and **every write on catalyst/cvp (on
+unifi, every write except reboot)** — returns a teaching "not supported on
+<platform> yet — open an issue or PR" error instead of a silent no-op. The
+full per-op matrix is in the repo README.
 
 ## Read tools (24)
 
@@ -79,7 +92,7 @@ are injected-only (they score data you already hold, e.g. from
 
 | Tool | Risk | Meraki API (preview) | Undo / safety |
 |------|------|----------------------|---------------|
-| `reboot_device` | **high** | `POST /devices/{serial}/reboot` | captures prior status; no safe inverse, no undo |
+| `reboot_device` | **high** | `POST /devices/{serial}/reboot` (unifi: `POST /api/s/{site}/cmd/devmgr` `{"cmd": "restart-device", "mac": ...}`) | captures prior status; no safe inverse, no undo |
 | `claim_devices_into_network` | **high** | `POST /networks/{id}/devices/claim` | inverse = remove the claimed serials |
 | `remove_device_from_network` | **high** | `POST /networks/{id}/devices/remove` | inverse = claim it back into the network |
 | `bind_network_to_template` | **high** | `POST /networks/{id}/bind` | captures the prior binding; inverse = rebind prior / unbind |
@@ -96,11 +109,14 @@ are injected-only (they score data you already hold, e.g. from
 - OT / industrial equipment (use the `industrial-aiops` line) and device-level
   CLI/SSH network automation
 
-- On **catalyst/cvp**: the unmapped reads in the matrix (licensing, VLANs,
-  traffic, uplink telemetry, ...), all writes, CVP configlet-content retrieval,
-  Catalyst Center per-client listing, and deep pagination
+- On **catalyst/cvp/unifi**: the unmapped reads in the matrix (licensing,
+  VLANs, traffic, uplink telemetry, ...), the unmapped writes (all on
+  catalyst/cvp; all but reboot on unifi), CVP configlet-content retrieval,
+  Catalyst Center per-client listing, UniFi legacy cookie login
+  (`POST /api/login` — use an API key) and blink-LED (`set-locate` has no
+  bounded duration), and deep pagination
 
-Want one of these — a missing Meraki call, a ❌ filled in on Catalyst Center or
-CloudVision Portal (writes included), or another controller platform entirely?
-Open an issue or PR — feedback and contributions welcome (a platform is one
-descriptor module: path templates + response adapters).
+Want one of these — a missing Meraki call, a ❌ filled in on Catalyst Center,
+CloudVision Portal, or UniFi Network (writes included), or another controller
+platform entirely? Open an issue or PR — feedback and contributions welcome (a
+platform is one descriptor module: path templates + response adapters).

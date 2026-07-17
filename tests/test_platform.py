@@ -12,6 +12,7 @@ from fabric_aiops.platform import (
     CVP,
     DEFAULT_MERAKI_BASE_URL,
     MERAKI,
+    UNIFI,
     PlatformUnsupported,
     get_platform,
     parse_next_link,
@@ -30,8 +31,8 @@ def test_meraki_is_registered_and_default():
 
 
 @pytest.mark.unit
-def test_three_platforms_registered():
-    assert set(platform_names()) == {MERAKI, CATALYST, CVP}
+def test_four_platforms_registered():
+    assert set(platform_names()) == {MERAKI, CATALYST, CVP, UNIFI}
 
 
 @pytest.mark.unit
@@ -42,9 +43,12 @@ def test_meraki_is_the_reference_platform_covering_every_canonical_op():
 
 
 @pytest.mark.unit
-def test_writes_are_meraki_only_today():
+def test_writes_are_meraki_only_except_unifi_reboot():
     for key in CANONICAL_WRITES:
-        assert platforms_supporting(key) == (MERAKI,)
+        if key == "devices.reboot":
+            assert platforms_supporting(key) == (MERAKI, UNIFI)
+        else:
+            assert platforms_supporting(key) == (MERAKI,)
 
 
 @pytest.mark.unit

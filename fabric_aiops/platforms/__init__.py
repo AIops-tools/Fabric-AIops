@@ -7,6 +7,6 @@ its own module body, so ``get_platform``/``platform_names`` always see the full
 registry. Adding a controller platform = adding a module here.
 """
 
-from fabric_aiops.platforms import catalyst, cvp, meraki
+from fabric_aiops.platforms import catalyst, cvp, meraki, unifi
 
-__all__ = ["meraki", "catalyst", "cvp"]
+__all__ = ["meraki", "catalyst", "cvp", "unifi"]

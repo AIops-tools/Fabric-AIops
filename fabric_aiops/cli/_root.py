@@ -15,6 +15,7 @@ from fabric_aiops.cli.org import org_app
 from fabric_aiops.cli.overview import overview_cmd
 from fabric_aiops.cli.remediate import remediate_app
 from fabric_aiops.cli.secret import secret_app
+from fabric_aiops.cli.undo import undo_app
 
 app = typer.Typer(
     name="fabric-aiops",
@@ -29,6 +30,7 @@ app.add_typer(client_app, name="client")
 app.add_typer(health_app, name="health")
 app.add_typer(remediate_app, name="remediate")
 app.add_typer(secret_app, name="secret")
+app.add_typer(undo_app, name="undo")
 app.command("init")(init_cmd)
 app.command("overview")(overview_cmd)
 app.command("doctor")(doctor_cmd)

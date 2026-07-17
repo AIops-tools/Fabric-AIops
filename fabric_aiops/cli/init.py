@@ -1,12 +1,12 @@
 """``fabric-aiops init`` — a friendly, interactive onboarding wizard.
 
 Walks a new user through connecting their first network-fabric controller —
-Cisco Meraki Dashboard, Cisco Catalyst Center, or Arista CloudVision Portal
-(the registered platforms): collects the non-secret connection details into
-``config.yaml`` and the platform secret (Meraki API key / Catalyst Center
-``username:password`` / CVP service-account token) into the *encrypted* store
-(never plaintext on disk). Designed to be run on a terminal; everything it
-needs is prompted with sensible defaults.
+Cisco Meraki Dashboard, Cisco Catalyst Center, Arista CloudVision Portal, or a
+UniFi Network controller (the registered platforms): collects the non-secret
+connection details into ``config.yaml`` and the platform secret (Meraki API key
+/ Catalyst Center ``username:password`` / CVP service-account token / UniFi API
+key) into the *encrypted* store (never plaintext on disk). Designed to be run
+on a terminal; everything it needs is prompted with sensible defaults.
 """
 
 from __future__ import annotations
@@ -96,6 +96,8 @@ def _prompt_base_url(platform: Platform) -> str:
         f"[dim]{platform.label} is per-install — enter your controller's URL "
         f"(default port {platform.default_port}, HTTPS).[/]"
     )
+    if platform.base_url_help:
+        console.print(f"[dim]{platform.base_url_help}[/]")
     while True:
         base_url = typer.prompt(f"Controller base URL (e.g. https://<{platform.name}-host>)")
         base_url = base_url.strip().rstrip("/")

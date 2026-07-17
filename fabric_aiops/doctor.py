@@ -84,8 +84,8 @@ def run_doctor(skip_auth: bool = False) -> int:
             conn = mgr.connect(target.name)
             # 'orgs.list' is the canonical top-of-hierarchy probe on every
             # platform (Meraki organizations / Catalyst Center sites / CVP
-            # containers) — it exercises auth (incl. the Catalyst Center
-            # session-token exchange) plus one real read.
+            # containers / UniFi sites) — it exercises auth (incl. the
+            # Catalyst Center session-token exchange) plus one real read.
             rows = op_get_pages(conn, "orgs.list")
             count = len(rows) if isinstance(rows, list) else 0
             _console.print(

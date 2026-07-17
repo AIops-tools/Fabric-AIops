@@ -17,6 +17,9 @@ Registered platforms:
     teaching :class:`PlatformUnsupported`).
   * ``cvp`` — Arista CloudVision Portal REST API (read coverage; containers
     stand in for organizations/networks; writes raise a teaching error).
+  * ``unifi`` — UniFi Network controller REST API (self-hosted controller or a
+    UniFi OS console via a ``/proxy/network`` base URL; read coverage plus the
+    device-restart write; sites stand in for organizations/networks).
 
 Adding a controller is a new descriptor module under
 ``fabric_aiops/platforms/`` — registry entries plus request/response
@@ -49,6 +52,7 @@ def seg(value: object) -> str:
 MERAKI = "meraki"
 CATALYST = "catalyst"
 CVP = "cvp"
+UNIFI = "unifi"
 
 DEFAULT_MERAKI_BASE_URL = "https://api.meraki.com/api/v1"
 
@@ -161,12 +165,22 @@ class PathSpec:
     unchanged (the reference platform), ``{}`` means drop them (they have no
     native equivalent). ``default_params`` are always sent (e.g. paging bounds
     a native endpoint requires).
+
+    Some controllers take a write as a *command envelope* in the request body
+    (e.g. a device-manager command carrying the device id) instead of encoding
+    everything in the path. ``static_body`` declares the fixed envelope fields
+    (e.g. the command name) and ``body_ids`` maps canonical ids into native
+    body fields (canonical name → body field). Both are merged with the
+    caller's JSON body by :meth:`Platform.body_for`; when neither is set the
+    caller's body passes through unchanged (the reference platform).
     """
 
     template: str
     id_query: Mapping[str, str] | None = None
     params_map: Mapping[str, str] | None = None
     default_params: Mapping[str, str] | None = None
+    static_body: Mapping[str, object] | None = None
+    body_ids: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -184,10 +198,16 @@ class Platform:
     requires_secret: bool = True
     requires_base_url: bool = False
     default_port: int = 443
+    # Extra base-URL guidance for the init wizard (e.g. a controller family
+    # with more than one URL layout).
+    base_url_help: str = ""
     # Auth: static header (bearer / vendor key) or a session-token exchange.
     auth_flow: str = AUTH_FLOW_STATIC
     token_path: str = ""
     token_header: str = ""
+    # Static-flow platforms whose key rides a vendor-specific header (e.g.
+    # ``X-API-KEY``) set it here; empty means bearer / style-selected header.
+    api_key_header: str = ""
     # Canonical-op mapping: path templates + per-key response adapters.
     paths: Mapping[str, PathSpec] = field(default_factory=dict)
     adapters: Mapping[str, Callable[[object], object]] = field(default_factory=dict)
@@ -198,13 +218,16 @@ class Platform:
         Static-flow platforms carry the stored secret directly: Meraki accepts
         ``Authorization: Bearer <key>`` (default) or the legacy
         ``X-Cisco-Meraki-API-Key`` header; CVP uses a Bearer service-account
-        token. Session-token platforms (Catalyst Center) return only the base
-        headers here — the short-lived token is fetched and attached per
-        request by the connection layer.
+        token; a platform with ``api_key_header`` set (UniFi Network's
+        ``X-API-KEY``) rides that vendor header. Session-token platforms
+        (Catalyst Center) return only the base headers here — the short-lived
+        token is fetched and attached per request by the connection layer.
         """
         headers: dict[str, str] = {}
         if self.auth_flow == AUTH_FLOW_STATIC:
-            if style == AUTH_MERAKI_KEY:
+            if self.api_key_header:
+                headers[self.api_key_header] = api_key
+            elif style == AUTH_MERAKI_KEY:
                 headers["X-Cisco-Meraki-API-Key"] = api_key
             else:
                 headers["Authorization"] = f"Bearer {api_key}"
@@ -268,6 +291,34 @@ class Platform:
                         query[native] = v
         return path, query
 
+    def body_for(
+        self,
+        key: str,
+        ids: Mapping[str, object] | None = None,
+        json_body: object = None,
+    ) -> object:
+        """Build the request body for a canonical write on this platform.
+
+        Most platforms pass the caller's ``json_body`` through unchanged. A
+        spec that declares ``static_body``/``body_ids`` (controllers whose
+        write endpoints take a command envelope — e.g. UniFi's device-manager
+        command with the device MAC in the body) gets a merged body: the
+        static envelope fields, then the canonical ids mapped to their native
+        body fields, then the caller's body (a new dict — inputs are never
+        mutated).
+        """
+        spec = self.paths.get(key)
+        if spec is None or (spec.static_body is None and spec.body_ids is None):
+            return json_body
+        body: dict[str, object] = dict(spec.static_body or {})
+        given = {k: v for k, v in (ids or {}).items() if v is not None}
+        for canonical, native in (spec.body_ids or {}).items():
+            if canonical in given:
+                body[native] = str(given[canonical])
+        if isinstance(json_body, Mapping):
+            body.update(json_body)
+        return body
+
     def adapt(self, key: str, payload: object) -> object:
         """Fold a raw response for ``key`` into the canonical (Meraki) shape."""
         adapter = self.adapters.get(key)
@@ -313,9 +364,9 @@ def parse_next_link(link_header: str | None) -> str | None:
 
     Meraki paginates list endpoints via a ``Link`` header whose ``next`` member
     carries the absolute URL of the following page (``startingAfter`` already
-    baked in). Returns None when there is no next page. Catalyst Center and CVP
-    do not use Link headers — their list endpoints are fetched as one bounded
-    page (deep pagination on those platforms is a known deferral).
+    baked in). Returns None when there is no next page. Catalyst Center, CVP
+    and UniFi do not use Link headers — their list endpoints are fetched as one
+    bounded page (deep pagination on those platforms is a known deferral).
     """
     if not link_header:
         return None
@@ -339,6 +390,7 @@ __all__ = [
     "MERAKI",
     "CATALYST",
     "CVP",
+    "UNIFI",
     "DEFAULT_MERAKI_BASE_URL",
     "AUTH_BEARER",
     "AUTH_MERAKI_KEY",

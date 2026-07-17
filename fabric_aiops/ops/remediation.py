@@ -10,7 +10,8 @@ governance harness (risk tier + audit + undo) and at the CLI layer by dry-run +
 double-confirm.
 
 Write support is per-platform: the reference platform (meraki) maps every
-write; on platforms that do not (catalyst, cvp — their change models are
+write; unifi maps device restart only (a devmgr command envelope); on
+platforms that map none (catalyst, cvp — their change models are
 task/configlet workflows that do not map onto these canonical writes), each
 function fails fast with a teaching ``PlatformUnsupported`` BEFORE any
 controller call — writes are never silently no-oped.

@@ -3,22 +3,26 @@
 Thin httpx wrapper with per-target session reuse and two auth flows, selected
 by the target's :class:`~fabric_aiops.platform.Platform` descriptor:
 
-  * **static** (Meraki, CVP) — a long-lived secret (Meraki API key or
-    CloudVision service-account token) is carried on every request in the
-    header the platform builds — ``Authorization: Bearer <secret>`` by
-    default, or Meraki's legacy ``X-Cisco-Meraki-API-Key`` header
-    (``auth_style: meraki-key``).
+  * **static** (Meraki, CVP, UniFi) — a long-lived secret (Meraki API key,
+    CloudVision service-account token, or UniFi API key) is carried on every
+    request in the header the platform builds — ``Authorization: Bearer
+    <secret>`` by default, Meraki's legacy ``X-Cisco-Meraki-API-Key`` header
+    (``auth_style: meraki-key``), or a vendor header the platform declares
+    (UniFi's ``X-API-KEY``).
   * **session-token** (Catalyst Center) — the stored ``username:password``
     secret is exchanged (HTTP Basic) at the platform's ``token_path`` for a
     short-lived token (~1 h) attached per request as ``X-Auth-Token``; on a
     401 the token is refreshed once and the request retried.
 
 ``api_base`` comes from the target (Meraki's includes the version path,
-``https://api.meraki.com/api/v1``; Catalyst Center / CVP targets point at the
-controller host and the platform's path templates carry the full API paths).
+``https://api.meraki.com/api/v1``; Catalyst Center / CVP / UniFi targets point
+at the controller host and the platform's path templates carry the full API
+paths — a UniFi OS console's base URL additionally carries the
+``/proxy/network`` prefix, which httpx joins ahead of every template path).
 Meraki list endpoints paginate via a ``Link`` header + ``perPage``/
 ``startingAfter``; :meth:`FabricConnection.get_pages` follows ``rel=next`` and
-aggregates. Catalyst Center / CVP list endpoints return one bounded page.
+aggregates. Catalyst Center / CVP / UniFi list endpoints return one bounded
+page.
 
 All non-2xx responses are translated centrally into ``FabricApiError`` with a
 teaching message — HTTP errors are translated at the connection layer rather

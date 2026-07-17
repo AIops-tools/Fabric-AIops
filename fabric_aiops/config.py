@@ -2,8 +2,9 @@
 
 Loads network-fabric controller connection targets from a YAML config file. Each
 target names its ``platform`` — ``meraki`` (Cisco Meraki Dashboard API, the
-reference platform), ``catalyst`` (Cisco Catalyst Center), or ``cvp`` (Arista
-CloudVision Portal). See :mod:`fabric_aiops.platform` for what each supports.
+reference platform), ``catalyst`` (Cisco Catalyst Center), ``cvp`` (Arista
+CloudVision Portal), or ``unifi`` (UniFi Network controller / UniFi OS console).
+See :mod:`fabric_aiops.platform` for what each supports.
 
 The secret (the controller **API key**) is NEVER stored in the config file and
 never on disk in plaintext: it lives in the encrypted store
@@ -73,12 +74,14 @@ class TargetConfig:
     """A connection target for one network-fabric controller.
 
     ``platform`` selects the controller family (``meraki``, ``catalyst``,
-    ``cvp``). ``base_url`` overrides the platform default (a Meraki
+    ``cvp``, ``unifi``). ``base_url`` overrides the platform default (a Meraki
     region/self-hosted proxy) — and is *required* for on-prem controllers
-    (Catalyst Center, CVP) that have no cloud default. ``org_id`` is a
-    convenience default scope id (Meraki organization / Catalyst Center site /
-    CVP container key) so most commands need only ``--target``. The secret
-    comes from the encrypted store, never the config file.
+    (Catalyst Center, CVP, UniFi — where a UniFi OS console carries the
+    ``/proxy/network`` prefix in the base URL) that have no cloud default.
+    ``org_id`` is a convenience default scope id (Meraki organization /
+    Catalyst Center site / CVP container key / UniFi site name) so most
+    commands need only ``--target``. The secret comes from the encrypted
+    store, never the config file.
     """
 
     name: str

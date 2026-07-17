@@ -1,9 +1,9 @@
 # fabric-aiops setup & security guide
 
 > Preview / mock-only — not yet validated against a live controller of any
-> platform (Meraki organization, Catalyst Center appliance, or CloudVision
-> Portal instance). Community-maintained; not affiliated with or endorsed by
-> Cisco/Meraki/Arista.
+> platform (Meraki organization, Catalyst Center appliance, CloudVision
+> Portal instance, or UniFi controller). Community-maintained; not affiliated
+> with or endorsed by Cisco/Meraki/Arista/Ubiquiti.
 
 ## 1. Install
 
@@ -31,13 +31,28 @@ token in CloudVision: **Settings → Access Control → Service Accounts**.
 fabric-aiops sends it as `Authorization: Bearer <token>`. A `base_url` is
 required (`https://<cvp-host>`).
 
+**UniFi Network (`platform: unifi`)** — create an **API key** in the UniFi
+console (UniFi OS: **Settings → Control Plane → Integrations**; self-hosted
+Network Server 9.0+: the admin's API-key page). fabric-aiops sends it as
+`X-API-KEY` on every request (stateless). The legacy cookie login
+(`POST /api/login`) is **not** supported — use an API key. A `base_url` is
+required and encodes the controller layout:
+- classic self-hosted controller: `https://<host>:8443`
+- UniFi OS console (UDM / UDM-Pro / Cloud Key Gen2):
+  `https://<console>/proxy/network` — keep the `/proxy/network` suffix; every
+  API path is issued relative to it.
+
+Set the target's `org_id` to the site's short name (e.g. `default`) —
+device-scoped calls (device get, switch ports, restart) use it as the
+`/api/s/{site}/` scope.
+
 ## 3. Onboard
 
 ```bash
 fabric-aiops init
 ```
 
-The wizard asks for the platform (`meraki` / `catalyst` / `cvp`), collects
+The wizard asks for the platform (`meraki` / `catalyst` / `cvp` / `unifi`), collects
 (non-secret) connection details into `~/.fabric-aiops/config.yaml`, and stores
 the secret **encrypted** into `~/.fabric-aiops/secrets.enc`. Example config:
 
@@ -58,6 +73,11 @@ targets:
     platform: cvp
     base_url: https://cvp.example.com          # required (per-install)
     org_id: "root"               # default container key (optional)
+  - name: home-lab
+    platform: unifi
+    base_url: https://unifi.example.com:8443   # classic controller
+    # base_url: https://console.example.com/proxy/network   # UniFi OS console
+    org_id: "default"            # site short name (fills /api/s/{site}/ scopes)
 ```
 
 ## 4. Non-interactive use (MCP server / CI / cron)
@@ -72,7 +92,7 @@ export FABRIC_AIOPS_MASTER_PASSWORD='your-master-password'
 ## Credential security
 
 - The controller secret (Meraki API key / Catalyst Center `username:password`
-  / CVP service-account token) is **never** written to disk in plaintext. It lives only in
+  / CVP service-account token / UniFi API key) is **never** written to disk in plaintext. It lives only in
   `~/.fabric-aiops/secrets.enc`, encrypted with Fernet (AES-128-CBC + HMAC),
   the key derived from your master password via scrypt. Only a per-store random
   salt and the ciphertext are on disk (chmod 600); the master password itself is
@@ -105,6 +125,8 @@ fabric-aiops doctor
 `doctor` checks the config file, the encrypted store and its permissions, that a
 secret (and, for on-prem platforms, a `base_url`) is present per target, and
 (unless `--skip-auth`) connectivity via the canonical top-of-hierarchy read —
-Meraki organizations, Catalyst Center sites, or CVP containers — which also
-exercises the platform's full auth flow (including the Catalyst Center
-session-token exchange).
+Meraki organizations, Catalyst Center sites, CVP containers, or UniFi sites —
+which also exercises the platform's full auth flow (including the Catalyst
+Center session-token exchange and, on unifi, the `X-API-KEY` header against
+the configured base URL — the fastest way to confirm a UniFi OS console's
+`/proxy/network` prefix is right).

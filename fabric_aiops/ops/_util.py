@@ -44,17 +44,32 @@ def _request_kwargs(query: dict | None, json_body: Any = None) -> dict:
     return kwargs
 
 
+def _scoped_ids(conn: Any, ids: dict) -> dict:
+    """Return ``ids`` with the target's default ``org_id`` added when absent.
+
+    Some platforms scope *device-level* paths under the canonical org segment
+    (UniFi's ``/api/s/{site}/...``) while the canonical signature carries only
+    the device id. The target's default ``org_id`` fills that hole; platforms
+    whose templates don't use it simply drop the extra id (``request_for``
+    discards leftover ids). Returns a new dict — never mutates the input.
+    """
+    if ids.get("org_id"):
+        return ids
+    default = getattr(getattr(conn, "target", None), "org_id", "") or ""
+    return {**ids, "org_id": default} if default else ids
+
+
 def op_get(conn: Any, key: str, *, params: dict | None = None, **ids: Any) -> Any:
     """GET one canonical resource; returns the adapted (canonical-shape) payload."""
     platform = platform_of(conn)
-    path, query = platform.request_for(key, ids, params)
+    path, query = platform.request_for(key, _scoped_ids(conn, ids), params)
     return platform.adapt(key, conn.get(path, **_request_kwargs(query)))
 
 
 def op_get_pages(conn: Any, key: str, *, params: dict | None = None, **ids: Any) -> list:
     """GET a canonical list resource (paginated where the platform paginates)."""
     platform = platform_of(conn)
-    path, query = platform.request_for(key, ids, params)
+    path, query = platform.request_for(key, _scoped_ids(conn, ids), params)
     adapted = platform.adapt(key, conn.get_pages(path, params=query or None))
     return adapted if isinstance(adapted, list) else [adapted]
 
@@ -62,15 +77,19 @@ def op_get_pages(conn: Any, key: str, *, params: dict | None = None, **ids: Any)
 def op_post(conn: Any, key: str, *, json_body: Any = None, **ids: Any) -> Any:
     """POST a canonical operation (write paths; guarded by the callers)."""
     platform = platform_of(conn)
-    path, query = platform.request_for(key, ids)
-    return platform.adapt(key, conn.post(path, **_request_kwargs(query, json_body)))
+    scoped = _scoped_ids(conn, ids)
+    path, query = platform.request_for(key, scoped)
+    body = platform.body_for(key, scoped, json_body)
+    return platform.adapt(key, conn.post(path, **_request_kwargs(query, body)))
 
 
 def op_put(conn: Any, key: str, *, json_body: Any = None, **ids: Any) -> Any:
     """PUT a canonical operation (write paths; guarded by the callers)."""
     platform = platform_of(conn)
-    path, query = platform.request_for(key, ids)
-    return platform.adapt(key, conn.put(path, **_request_kwargs(query, json_body)))
+    scoped = _scoped_ids(conn, ids)
+    path, query = platform.request_for(key, scoped)
+    body = platform.body_for(key, scoped, json_body)
+    return platform.adapt(key, conn.put(path, **_request_kwargs(query, body)))
 
 
 def as_list(data: Any, list_key: str | None = None) -> list[dict]:
