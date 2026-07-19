@@ -4,6 +4,7 @@ from typing import Optional
 
 from fabric_aiops.governance import governed_tool
 from fabric_aiops.ops import devices as ops
+from fabric_aiops.ops.devices import DEFAULT_DEVICE_LIMIT
 from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
@@ -13,6 +14,7 @@ from mcp_server._shared import _get_connection, mcp, tool_errors
 def device_inventory(
     org_id: Optional[str] = None,
     model: Optional[str] = None,
+    limit: int = DEFAULT_DEVICE_LIMIT,
     target: Optional[str] = None,
 ) -> dict:
     """[READ] Org device inventory, optionally filtered by model family.
@@ -23,9 +25,12 @@ def device_inventory(
     Args:
         org_id: Meraki organization id; omit to use the target's default org.
         model: Model family/prefix to filter (e.g. 'MS', 'MR46'); omit for all.
+        limit: Max rows in the returned list (default 500). The result carries
+            'returned'/'limit'/'truncated'; re-run with a higher limit when
+            'truncated' is true rather than treating the list as complete.
         target: Target name from config; omit for the default.
     """
-    return ops.inventory(_get_connection(target), org_id, model)
+    return ops.inventory(_get_connection(target), org_id, model, limit=limit)
 
 
 @mcp.tool()

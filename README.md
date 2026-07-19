@@ -1,6 +1,6 @@
 <!-- mcp-name: io.github.AIops-tools/fabric-aiops -->
 
-# Fabric AIops (preview)
+# Fabric AIops
 
 > **Disclaimer**: Community-maintained open-source project. **Not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, Ubiquiti, or any network-controller vendor.** "Cisco", "Meraki", "Catalyst", "DNA Center", "Arista", "CloudVision", "Ubiquiti", "UniFi" and all product/trademark names belong to their respective owners. MIT licensed.
 
@@ -16,8 +16,9 @@ construction**: a registry keyed by `platform` maps every *canonical operation*
 onto each controller's REST API (path templates + response adapters), so adding
 a controller is a registry entry, never new ops/CLI/MCP surface. An operation a
 platform doesn't map returns a clear teaching error ("not supported on X yet —
-open an issue"), never a silent no-op. **Preview — mock-validated only, not
-verified against a live controller of any platform.**
+open an issue"), never a silent no-op. The test suite is mock-based; no
+platform has yet been exercised against a live controller — see
+[`docs/VERIFICATION.md`](docs/VERIFICATION.md).
 
 ## What it does
 
@@ -36,12 +37,12 @@ Three flagship signature analyses, plus the guarded reads and writes around them
 ## What works
 
 - **CLI** (`fabric-aiops ...`): `init`, `overview`, `org`, `network`, `device`, `client`, `health`, `remediate`, `secret`, `doctor`, `mcp`.
-- **MCP server** (`fabric-aiops mcp` or `fabric-aiops-mcp`): **32 tools** (24 read, 8 write), every one wrapped with the bundled `@governed_tool` harness.
+- **MCP server** (`fabric-aiops mcp` or `fabric-aiops-mcp`): **34 tools** (25 read, 9 write), every one wrapped with the bundled `@governed_tool` harness.
 - **Encrypted credentials**: the controller secret (Meraki API key / Catalyst Center `username:password` / CVP service-account token / UniFi API key) lives in an encrypted store `~/.fabric-aiops/secrets.enc` (Fernet + scrypt) — **never plaintext on disk**. Unlock with a master password from `FABRIC_AIOPS_MASTER_PASSWORD` (MCP/CI) or an interactive prompt (CLI).
 - **Reversibility**: mutating writes fetch the **real before-state first** and record a faithful inverse (`update_device`/`update_network_vlan` restore prior values; `claim`↔`remove`; `bind`↔`unbind`/rebind). Irreversible ops (`reboot_device`, `blink_device_leds`) record the prior state for audit but declare no undo.
 - **Safety**: every state-changing CLI op supports `--dry-run` and requires double confirmation; every write MCP tool takes a `dry_run` preview.
 
-## Capability matrix (32 MCP tools)
+## Capability matrix (34 MCP tools)
 
 | Domain | Tools | Count | R/W |
 |--------|-------|:-----:|:---:|
@@ -54,6 +55,8 @@ Three flagship signature analyses, plus the guarded reads and writes around them
 | **Remediation** | `reboot_device`, `claim_devices_into_network`, `remove_device_from_network`, `bind_network_to_template`, `unbind_network_from_template` | 5 | write (high) |
 | | `update_device`, `update_network_vlan` | 2 | write (medium) |
 | | `blink_device_leds` | 1 | write (low) |
+| **Undo** | `undo_list` | 1 | read |
+| | `undo_apply` | 1 | write (medium) |
 
 `network_health_score` and `config_template_drift` are injected-only (they score
 data you already hold); `uplink_loss_and_latency_rca` accepts injected `records`
@@ -117,6 +120,46 @@ of secret; `fabric-aiops doctor` probes each target with the canonical
 top-of-hierarchy read (organizations / sites / containers / UniFi sites),
 exercising the full auth flow.
 
+## Security: read-only mode
+
+This tool is meant to be handed to an AI agent, so its safety story is enforced
+by the server rather than requested in a prompt:
+
+```bash
+export FABRIC_READ_ONLY=1
+```
+
+With that set, the **9 write tools are never registered**. An MCP client
+lists **25 tools instead of 34** — the writes are not hidden, not
+gated behind a flag, and not merely refused when called. They are absent from
+the session. A model cannot invoke a tool it was never offered, and cannot be
+argued into one.
+
+That distinction is the whole point. A tool that exists but refuses still invites
+retry loops and "I'll describe the call instead" behaviour from smaller models,
+and it leaves a reviewer trusting a promise. An absent tool is a fact you can
+check: connect, list the tools, and see that the writes are not there.
+
+Enforcement is two layers deep, so the switch cannot be sidestepped by changing
+entry point:
+
+| Layer | What it does | Covers |
+|---|---|---|
+| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
+| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
+
+Read operations are unaffected, and every call is still audited to
+`~/.fabric-aiops/audit.db`.
+
+> The read/write split is derived from each tool's declared `risk_level`, and a
+> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
+> tool's own documentation — so a write can't quietly present itself as a read.
+
+Running a smaller / local model? See
+[agent-guardrails.md](skills/fabric-aiops/references/agent-guardrails.md) — it lists
+the guardrails this tool now enforces for you (so you don't spend prompt budget
+restating them) and gives a ready-made system prompt for what's left.
+
 ## Quick start
 
 ```bash
@@ -168,8 +211,8 @@ adapters).
 
 ## Status
 
-**Preview — mock-validated only, not verified against a live Meraki
-organization, Catalyst Center appliance, CloudVision Portal instance, or UniFi
-controller.** All four platforms' API paths are modelled from the public API
-shapes and need live verification. `fabric-aiops doctor` is the fastest live
-check.
+The test suite is mock-based. No platform has yet been exercised against a live
+Meraki organization, Catalyst Center appliance, CloudVision Portal instance, or
+UniFi controller — all four platforms' API paths are modelled from the public
+API shapes. [`docs/VERIFICATION.md`](docs/VERIFICATION.md) defines the checklist
+a live run must cover; `fabric-aiops doctor` is the fastest live check.

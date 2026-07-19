@@ -18,7 +18,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import clean_list, op_get, op_get_pages, require_org
+from fabric_aiops.ops._util import bounded, clean_list, op_get, op_get_pages, require_org
+
+#: Default cap on the device rows the inventory read returns.
+DEFAULT_DEVICE_LIMIT = 500
 
 # Recognised Meraki product-model prefixes.
 MODEL_PREFIXES = ("MX", "MS", "MR", "MV", "MG")
@@ -33,13 +36,20 @@ def _model_prefix(model: Any) -> str | None:
     return None
 
 
-def inventory(conn: Any, org_id: str | None = None, model: str | None = None) -> dict:
+def inventory(
+    conn: Any,
+    org_id: str | None = None,
+    model: str | None = None,
+    limit: int = DEFAULT_DEVICE_LIMIT,
+) -> dict:
     """[READ] Org device inventory, optionally filtered by model family.
 
     Pulls ``/organizations/{id}/devices`` and buckets devices by model prefix
     (MX/MS/MR/MV/MG). ``model`` filters to one family (e.g. ``MS`` for switches);
     an exact model string (e.g. ``MR46``) also works via prefix match. Returns
-    the per-family counts and the (filtered) device rows.
+    the per-family counts and the (filtered) device rows, capped at ``limit``
+    with ``truncated`` saying so explicitly. ``total`` and ``matched`` are
+    always the full counts.
     """
     oid = require_org(conn, org_id)
     rows = clean_list(op_get_pages(conn, "devices.list", org_id=oid))
@@ -60,7 +70,7 @@ def inventory(conn: Any, org_id: str | None = None, model: str | None = None) ->
         "modelFilter": wanted,
         "byModelFamily": dict(sorted(by_model.items(), key=lambda kv: kv[1], reverse=True)),
         "matched": len(filtered),
-        "devices": filtered[:500],
+        **bounded(filtered, limit, "devices"),
     }
 
 

@@ -7,7 +7,16 @@ from typing import Annotated
 
 import typer
 
-from fabric_aiops.cli._common import OrgOption, TargetOption, cli_errors, console, get_connection
+from fabric_aiops.cli._common import (
+    LimitOption,
+    OrgOption,
+    TargetOption,
+    cli_errors,
+    console,
+    get_connection,
+    limit_kwargs,
+    print_result,
+)
 
 network_app = typer.Typer(
     name="network",
@@ -50,12 +59,14 @@ def network_vlans(network_id: NetIdArg, target: TargetOption = None) -> None:
 
 @network_app.command("alerts")
 @cli_errors
-def network_alerts(network_id: NetIdArg, target: TargetOption = None) -> None:
+def network_alerts(
+    network_id: NetIdArg, limit: LimitOption = None, target: TargetOption = None
+) -> None:
     """Current network health alerts, summarised by severity."""
     from fabric_aiops.ops import networks as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.network_alerts(conn, network_id)))
+    print_result(ops.network_alerts(conn, network_id, **limit_kwargs(limit)))
 
 
 @network_app.command("traffic")
@@ -63,10 +74,11 @@ def network_alerts(network_id: NetIdArg, target: TargetOption = None) -> None:
 def network_traffic(
     network_id: NetIdArg,
     timespan: Annotated[int, typer.Option(help="Look-back seconds (7200..2592000)")] = 86400,
+    limit: LimitOption = None,
     target: TargetOption = None,
 ) -> None:
     """Application/protocol traffic mix for a network, top apps by bytes."""
     from fabric_aiops.ops import networks as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.traffic_summary(conn, network_id, timespan)))
+    print_result(ops.traffic_summary(conn, network_id, timespan, **limit_kwargs(limit)))

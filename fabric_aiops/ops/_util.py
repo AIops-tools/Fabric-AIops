@@ -115,9 +115,35 @@ def clean_list(data: Any, list_key: str | None = None) -> list[dict]:
     return [_sanitize_obj(row) for row in as_list(data, list_key)]
 
 
-def s(value: Any, limit: int = 128) -> str:
-    """Sanitize an arbitrary value to a bounded, injection-safe string."""
-    return sanitize(str(value if value is not None else ""), limit)
+def bounded(rows: list, limit: int, key: str) -> dict:
+    """Return a truncation envelope for ``rows`` capped at ``limit``.
+
+    A bare capped list cannot say "there is more" — the consumer has to infer it
+    from the length happening to equal the cap, and a smaller local model faced
+    with a cut-off result tends to report either that nothing came back or that
+    it has seen everything. So every capped read announces the cut explicitly::
+
+        {"<key>": [...], "returned": 25, "limit": 25, "truncated": true}
+
+    Truncation is **measured** against the full result the controller returned,
+    never guessed from a length coincidence.
+
+    Args:
+        rows: The complete result set, before capping.
+        limit: Maximum rows to return.
+        key: Name of the list field in the returned envelope.
+
+    Returns:
+        The envelope dict: the capped rows plus returned / limit / truncated.
+    """
+    capped = max(0, int(limit))
+    kept = list(rows)[:capped]
+    return {
+        key: kept,
+        "returned": len(kept),
+        "limit": capped,
+        "truncated": len(rows) > capped,
+    }
 
 
 def require_org(conn: Any, org_id: str | None) -> str:

@@ -10,7 +10,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import clean, clean_list, op_get, op_get_pages, require_org
+from fabric_aiops.ops._util import (
+    bounded,
+    clean,
+    clean_list,
+    op_get,
+    op_get_pages,
+    require_org,
+)
+
+#: Default cap on the raw rows a summarising read returns alongside its rollup.
+DEFAULT_ALERT_LIMIT = 200
+DEFAULT_APP_LIMIT = 25
 
 
 def list_networks(conn: Any, org_id: str | None = None) -> list[dict]:
@@ -29,12 +40,16 @@ def list_vlans(conn: Any, network_id: str) -> list[dict]:
     return clean_list(op_get(conn, "networks.vlans", network_id=network_id))
 
 
-def network_alerts(conn: Any, network_id: str) -> dict:
+def network_alerts(
+    conn: Any, network_id: str, limit: int = DEFAULT_ALERT_LIMIT
+) -> dict:
     """[READ] Current network health alerts, summarised by severity.
 
     Pulls ``/networks/{id}/health/alerts`` and rolls the open alerts up by
     severity (critical/warning/info) so an agent sees the blast radius before
-    reading individual alerts. The raw alert rows are returned too (bounded).
+    reading individual alerts. The raw alert rows are returned too, capped at
+    ``limit`` — and the cap announces itself via ``truncated`` rather than
+    leaving the consumer to infer it. ``total`` is always the full count.
     """
     rows = clean_list(op_get(conn, "networks.alerts", network_id=network_id))
     by_severity: dict[str, int] = {}
@@ -45,16 +60,19 @@ def network_alerts(conn: Any, network_id: str) -> dict:
         "networkId": network_id,
         "total": len(rows),
         "bySeverity": dict(sorted(by_severity.items(), key=lambda kv: kv[1], reverse=True)),
-        "alerts": rows[:200],
+        **bounded(rows, limit, "alerts"),
     }
 
 
-def traffic_summary(conn: Any, network_id: str, timespan: int = 86400) -> dict:
+def traffic_summary(
+    conn: Any, network_id: str, timespan: int = 86400, limit: int = DEFAULT_APP_LIMIT
+) -> dict:
     """[READ] Application/protocol traffic mix for a network over ``timespan`` seconds.
 
     Pulls ``/networks/{id}/traffic`` and ranks applications by total bytes
     (sent + received), so an agent can answer "what's using the pipe" without
-    parsing the whole series.
+    parsing the whole series. The ranked rows are capped at ``limit`` and the
+    cap announces itself via ``truncated``; ``applicationCount`` is the full count.
     """
     span = max(7200, min(int(timespan), 2592000))  # Meraki bounds: 2h .. 30d
     rows = clean_list(
@@ -80,5 +98,5 @@ def traffic_summary(conn: Any, network_id: str, timespan: int = 86400) -> dict:
         "networkId": network_id,
         "timespanSeconds": span,
         "applicationCount": len(ranked),
-        "topApplications": ranked[:25],
+        **bounded(ranked, limit, "topApplications"),
     }

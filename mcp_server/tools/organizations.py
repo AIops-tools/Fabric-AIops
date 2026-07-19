@@ -5,6 +5,7 @@ from typing import Optional
 from fabric_aiops.governance import governed_tool
 from fabric_aiops.ops import organizations as ops
 from fabric_aiops.ops import overview as ov
+from fabric_aiops.ops.organizations import DEFAULT_DEVICE_LIMIT
 from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
@@ -78,14 +79,21 @@ def org_admins(org_id: Optional[str] = None, target: Optional[str] = None) -> li
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def org_device_statuses(org_id: Optional[str] = None, target: Optional[str] = None) -> dict:
+def org_device_statuses(
+    org_id: Optional[str] = None,
+    limit: int = DEFAULT_DEVICE_LIMIT,
+    target: Optional[str] = None,
+) -> dict:
     """[READ] Org-wide device availability rolled up by status + product type.
 
     Args:
         org_id: Meraki organization id; omit to use the target's default org.
+        limit: Max rows in the returned list (default 500). The result carries
+            'returned'/'limit'/'truncated'; re-run with a higher limit when
+            'truncated' is true rather than treating the list as complete.
         target: Target name from config; omit for the default.
     """
-    return ops.device_statuses(_get_connection(target), org_id)
+    return ops.device_statuses(_get_connection(target), org_id, limit=limit)
 
 
 @mcp.tool()

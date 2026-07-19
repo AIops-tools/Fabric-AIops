@@ -75,7 +75,7 @@ def tool_errors(shape: str = "dict") -> Callable:
 mcp = FastMCP(
     "fabric-aiops",
     instructions=(
-        "Governed network-fabric controller operations (preview) for the Cisco "
+        "Governed network-fabric controller operations for the Cisco "
         "Meraki Dashboard API (full read+write), Cisco Catalyst Center (read "
         "subset: sites stand in for organizations/networks), and Arista "
         "CloudVision Portal (read subset: containers stand in for "

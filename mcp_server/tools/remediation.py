@@ -132,14 +132,18 @@ def reboot_device(serial: str, dry_run: bool = False, target: Optional[str] = No
 
 
 @mcp.tool()
-@governed_tool(risk_level="low")
+@governed_tool(risk_level="medium")
 @tool_errors("dict")
 def blink_device_leds(
     serial: str, duration: int = 20, target: Optional[str] = None
 ) -> dict:
-    """[WRITE][risk=low] Blink a device's locator LEDs to find it physically.
+    """[WRITE][risk=medium] Blink a device's locator LEDs to find it physically.
 
-    No configuration change (a locate aid), so no undo is recorded.
+    No configuration change (a locate aid), so no undo is recorded. It is still
+    a POST to the controller, so it is tiered as a write: ``risk_level="low"``
+    is what marks a tool as a *read*, and read-only mode keys off exactly that.
+    Tiering this "low" would have left it callable — and exposed — with
+    FABRIC_READ_ONLY set, contradicting its own [WRITE] tag.
 
     Args:
         serial: Device serial.

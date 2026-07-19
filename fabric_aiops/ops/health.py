@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fabric_aiops.ops._util import clean_list, op_get_pages, require_org
+from fabric_aiops.ops._util import bounded, clean_list, op_get_pages, require_org
 
 MAX_ROWS = 100
 
@@ -82,6 +82,7 @@ def uplink_loss_and_latency_rca(
     records: list[dict],
     loss_pct: float = DEFAULT_LOSS_PCT,
     latency_ms: float = DEFAULT_LATENCY_MS,
+    limit: int = MAX_ROWS,
 ) -> dict:
     """[READ] Rank the worst MX WAN uplinks by loss + latency and map cause+action.
 
@@ -90,6 +91,9 @@ def uplink_loss_and_latency_rca(
     latencyMs}]}. Ranks worst-first by a composite of average loss and latency,
     flags each degraded uplink against the thresholds, and attaches a likely
     cause + recommended action. Every ranking carries its numbers.
+
+    ``worst`` is capped at ``limit`` and says so via ``truncated``;
+    ``uplinksEvaluated`` is always the full count.
     """
     ranked = []
     for r in records or []:
@@ -119,7 +123,7 @@ def uplink_loss_and_latency_rca(
         "uplinksEvaluated": len(ranked),
         "degradedCount": len(degraded),
         "thresholds": {"lossPct": loss_pct, "latencyMs": latency_ms},
-        "worst": ranked[:MAX_ROWS],
+        **bounded(ranked, limit, "worst"),
         "note": (
             "Advisory read-only heuristic: uplinks ranked by avg loss (x10) + avg "
             "latency; 'degraded' means avg loss >= lossPct or avg latency >= latencyMs."
@@ -171,6 +175,7 @@ def network_health_score(
     device_statuses: list[dict],
     uplinks: list[dict] | None = None,
     alerts: list[dict] | None = None,
+    limit: int = MAX_ROWS,
 ) -> dict:
     """[READ] Composite fleet health score per network, worst-first.
 
@@ -185,6 +190,8 @@ def network_health_score(
         device_statuses: rows {serial, networkId, status, productType}.
         uplinks: rows {networkId, status} (active/ready = healthy).
         alerts: rows {networkId, severity} (critical/warning/info).
+        limit: Max scored networks in ``worst``; ``truncated`` says when the
+            list was cut. ``networksEvaluated`` is always the full count.
     """
     dev_by_net: dict[str, list[dict]] = {}
     for d in device_statuses or []:
@@ -226,7 +233,7 @@ def network_health_score(
         "fleetScore": fleet,
         "summary": summary,
         "weights": {"online": _W_ONLINE, "uplink": _W_UPLINK, "alerts": _W_ALERTS},
-        "worst": scored[:MAX_ROWS],
+        **bounded(scored, limit, "worst"),
         "note": (
             "Advisory read-only heuristic: score = 0.5*online% + 0.3*uplinkHealth% "
             "+ 0.2*(100 - alertPenalty); bands healthy>=80, degraded 50-79, critical<50."
@@ -237,7 +244,9 @@ def network_health_score(
 # ── 3. config template drift ────────────────────────────────────────────────
 
 
-def config_template_drift(template: dict, networks: list[dict]) -> dict:
+def config_template_drift(
+    template: dict, networks: list[dict], limit: int = MAX_ROWS
+) -> dict:
     """[READ] For networks bound to a config template, list drifted settings.
 
     Pure analysis. ``template`` is {id, name, settings:{key: value}}; each
@@ -245,6 +254,9 @@ def config_template_drift(template: dict, networks: list[dict]) -> dict:
     networks whose ``boundTemplateId`` matches ``template['id']`` are compared;
     for each, every settings key whose value differs from the template's is
     reported as expected-vs-actual. Networks that match exactly are compliant.
+
+    ``driftedNetworks`` is capped at ``limit`` and says so via ``truncated``;
+    ``driftedCount`` is always the full count.
     """
     tmpl_id = (template or {}).get("id")
     tmpl_settings = (template or {}).get("settings") or {}
@@ -275,7 +287,7 @@ def config_template_drift(template: dict, networks: list[dict]) -> dict:
         "driftedCount": len(drifted),
         "compliantCount": len(bound) - len(drifted),
         "settingsChecked": list(tmpl_settings.keys()),
-        "driftedNetworks": drifted[:MAX_ROWS],
+        **bounded(drifted, limit, "driftedNetworks"),
         "note": (
             "Advisory read-only check: compares each bound network's settings to "
             "the template by exact value; only networks bound to templateId are checked."

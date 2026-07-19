@@ -19,6 +19,7 @@ from fabric_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_print,
+    print_result,
 )
 
 undo_app = typer.Typer(
@@ -39,7 +40,7 @@ def undo_list_cmd(
     """List recorded, not-yet-applied undo tokens."""
     from mcp_server.tools import undo as gov
 
-    console.print_json(json.dumps(gov.undo_list(limit=limit, target=target)))
+    print_result(gov.undo_list(limit=limit, target=target))
 
 
 @undo_app.command("apply")

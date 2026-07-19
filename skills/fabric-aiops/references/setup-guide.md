@@ -1,8 +1,8 @@
 # fabric-aiops setup & security guide
 
-> Preview / mock-only — not yet validated against a live controller of any
-> platform (Meraki organization, Catalyst Center appliance, CloudVision
-> Portal instance, or UniFi controller). Community-maintained; not affiliated
+> Not yet exercised against a live controller of any platform (Meraki
+> organization, Catalyst Center appliance, CloudVision Portal instance, or
+> UniFi controller) — see docs/VERIFICATION.md. Community-maintained; not affiliated
 > with or endorsed by Cisco/Meraki/Arista/Ubiquiti.
 
 ## 1. Install

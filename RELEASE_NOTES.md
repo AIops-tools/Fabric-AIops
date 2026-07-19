@@ -1,51 +1,60 @@
-# Fabric AIops v0.1.0 — preview
+# Release notes — fabric-aiops 0.5.0
 
-Governed AI-ops for **network fabrics** managed through the **Cisco Meraki
-Dashboard API** (organizations → networks → devices) for AI agents, with a
-built-in governance harness (audit, policy, token/runaway budget, undo-token
-recording, graduated risk tiers) and an encrypted credential store. Standalone —
-no external skill-family dependency. Multi-platform by construction; Meraki is
-the one platform shipped in v0.1.
+Previous release: 0.4.0.
 
-> **Preview / mock-only.** All behaviour is validated against mocked Dashboard
-> API responses; it has not been run against a live Meraki organization. The
-> fastest live check is `fabric-aiops doctor`.
->
-> Community-maintained; **not affiliated with or endorsed by Cisco/Meraki.**
-> Trademarks belong to their owners.
-
-## Highlights
-
-- **32 MCP tools** (24 read, 8 write), every one wrapped with `@governed_tool`.
-  - Read: fleet `overview`; organizations (6); networks (5); devices (5);
-    clients (4); and three flagship analyses.
-  - Write: `reboot_device`/`claim_devices_into_network`/`remove_device_from_network`/
-    `bind_network_to_template`/`unbind_network_from_template` (high),
-    `update_device`/`update_network_vlan` (medium, capture before-state),
-    `blink_device_leds` (low).
-- **Three signature analyses** — `uplink_loss_and_latency_rca` (rank worst MX WAN
-  uplinks + cause/action), `network_health_score` (composite per-network health),
-  and `config_template_drift` (settings drifted from a bound template).
-- **Encrypted API key store** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) —
-  never plaintext on disk; legacy `FABRIC_<TARGET>_APIKEY` env fallback.
-- **CLI** with an `init` onboarding wizard, `secret` management, and `doctor`.
-- **Multi-platform connection layer** — a `platform` registry (`Authorization:
-  Bearer` or `X-Cisco-Meraki-API-Key` auth, `Link`-header pagination) with
-  teaching error translation (`FabricApiError`); only Meraki registered in v0.1.
-
-## Install
+## Headline: read-only mode
 
 ```bash
-uv tool install fabric-aiops
-fabric-aiops init
-fabric-aiops doctor
+export FABRIC_READ_ONLY=1
 ```
 
-## Caveats
+With this set the **9 write tools are never registered** — an MCP
+client lists **25 tools instead of 34**. The writes are not hidden
+behind a flag and not merely refused on call: they are absent from the session,
+so a model cannot invoke one and cannot be argued into one. For a reviewer this
+is checkable rather than promised — connect, list the tools, and the writes are
+not there.
 
-- The Dashboard API paths are modelled from the public API shape and need live
-  verification against a real organization.
-- Out of scope by design: full org/network provisioning workflows, firmware
-  upgrade orchestration, and any bulk destructive operation.
-- Missing a capability or want another controller platform (Catalyst Center,
-  Arista CVP)? Open an issue or PR.
+Enforcement is two layers deep: the `@governed_tool` harness refuses every
+non-read operation (covering the CLI and in-process callers too), and the MCP
+server removes write tools from `list_tools()`. Changing entry point does not
+get around it.
+
+### Security fix included in this release
+
+1 tool(s) documented as writes were carrying `risk_level="low"`:
+`blink_device_leds`.
+
+Because the read/write split keys off `risk_level`, read-only mode would have
+left them **exposed and able to execute real writes**. They are now `medium`,
+and a new test asserts `risk_level` can never again disagree with a tool's own
+`[READ]`/`[WRITE]` documentation.
+
+## BREAKING — return shapes changed
+
+This release changes payloads that callers may be parsing. All three changes exist
+to stop a result from misrepresenting itself:
+
+1. **Absent fields are now `null`, not `""`.** A missing value and an empty value
+   were previously indistinguishable, which invited consumers to invent the
+   difference. Keys are still always present — only the value may be null.
+2. **Anything with a `limit` now returns an envelope** —
+   `{"<items>": [...], "returned": N, "limit": L, "truncated": bool}`. Truncation is
+   *measured* (one extra row is fetched), never inferred from the page happening to
+   be full. Where a genuine pre-cap total is knowable it is reported as `total`;
+   where it isn't, `total` is deliberately omitted rather than echoing `returned`.
+3. **`risk_level` changed on some tools** (see above). If your `rules.yaml` matches
+   on risk level, re-check those rules.
+
+## Also in this release
+
+- **`docs/VERIFICATION.md`** — what the mock suite actually guarantees, a live
+  verification checklist, and the criteria for claiming this tool verified.
+- **`skills/fabric-aiops/references/agent-guardrails.md`** — for driving this tool with a
+  smaller / local model: which guardrails are now enforced for you, and a
+  ready-made system prompt for the rest.
+- Expanded operator playbooks in the skill documentation.
+- The advertised tool count now matches what an MCP client actually lists
+  (it includes `undo_list` / `undo_apply`), and a release gate keeps it honest.
+- The `(preview)` label has been dropped. It never meant unreleased; verification
+  status now lives in `docs/VERIFICATION.md` where it can be specific.

@@ -12,12 +12,16 @@ from typing import Any
 
 from fabric_aiops.ops._util import (
     as_list,
+    bounded,
     clean,
     clean_list,
     op_get,
     op_get_pages,
     require_org,
 )
+
+#: Default cap on the raw device rows returned alongside the status rollup.
+DEFAULT_DEVICE_LIMIT = 500
 
 
 def list_organizations(conn: Any) -> list[dict]:
@@ -43,13 +47,16 @@ def list_admins(conn: Any, org_id: str | None = None) -> list[dict]:
     return clean_list(op_get(conn, "orgs.admins", org_id=oid))
 
 
-def device_statuses(conn: Any, org_id: str | None = None) -> dict:
+def device_statuses(
+    conn: Any, org_id: str | None = None, limit: int = DEFAULT_DEVICE_LIMIT
+) -> dict:
     """[READ] Org-wide device availability, rolled up by status and product type.
 
     Pulls ``/organizations/{id}/devices/statuses`` and summarises: how many
     devices are online / offline / alerting / dormant, and the breakdown by
     product type (appliance/switch/wireless/camera/cellularGateway). The raw
-    per-device rows are returned too (bounded), so an agent can drill in.
+    per-device rows are returned too, capped at ``limit``, with ``truncated``
+    saying so explicitly. ``total`` is always the full count.
     """
     oid = require_org(conn, org_id)
     rows = clean_list(op_get_pages(conn, "orgs.device_statuses", org_id=oid))
@@ -65,7 +72,7 @@ def device_statuses(conn: Any, org_id: str | None = None) -> dict:
         "total": len(rows),
         "byStatus": dict(sorted(by_status.items(), key=lambda kv: kv[1], reverse=True)),
         "byProductType": dict(sorted(by_product.items(), key=lambda kv: kv[1], reverse=True)),
-        "devices": rows[:500],
+        **bounded(rows, limit, "devices"),
     }
 
 

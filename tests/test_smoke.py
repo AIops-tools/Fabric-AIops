@@ -42,8 +42,10 @@ HIGH_RISK = {
     "reboot_device", "claim_devices_into_network", "remove_device_from_network",
     "bind_network_to_template", "unbind_network_from_template",
 }
-MEDIUM_RISK = {"update_device", "update_network_vlan"}
-LOW_RISK_WRITE = {"blink_device_leds"}
+# blink_device_leds is non-destructive but still a controller POST, so it is
+# tiered as a write: risk_level "low" is what marks a tool as a *read*, and
+# read-only mode keys off exactly that. There is no "low-risk write" tier.
+MEDIUM_RISK = {"update_device", "update_network_vlan", "blink_device_leds"}
 
 
 @pytest.mark.unit
@@ -158,6 +160,9 @@ def test_every_mcp_tool_is_governed_by_harness():
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
+    assert len(tool_objs) == 34, (
+        "tool count changed — update README/SKILL/server.json too"
+    )
     for name, tool in tool_objs.items():
         fn = getattr(tool, "fn", None)
         assert fn is not None, f"{name} has no fn"
@@ -174,8 +179,6 @@ def test_write_tools_have_correct_risk_tiers():
         assert getattr(rem, name)._risk_level == "high", name
     for name in MEDIUM_RISK:
         assert getattr(rem, name)._risk_level == "medium", name
-    for name in LOW_RISK_WRITE:
-        assert getattr(rem, name)._risk_level == "low", name
 
 
 @pytest.mark.unit

@@ -7,7 +7,16 @@ from typing import Annotated
 
 import typer
 
-from fabric_aiops.cli._common import OrgOption, TargetOption, cli_errors, console, get_connection
+from fabric_aiops.cli._common import (
+    LimitOption,
+    OrgOption,
+    TargetOption,
+    cli_errors,
+    console,
+    get_connection,
+    limit_kwargs,
+    print_result,
+)
 
 device_app = typer.Typer(
     name="device",
@@ -23,13 +32,14 @@ SerialArg = Annotated[str, typer.Argument(help="Device serial (from 'device inve
 def device_inventory(
     org_id: OrgOption = None,
     model: Annotated[str | None, typer.Option("--model", help="Model family/prefix")] = None,
+    limit: LimitOption = None,
     target: TargetOption = None,
 ) -> None:
     """Org device inventory, optionally filtered by model family."""
     from fabric_aiops.ops import devices as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.inventory(conn, org_id, model)))
+    print_result(ops.inventory(conn, org_id, model, **limit_kwargs(limit)))
 
 
 @device_app.command("status")

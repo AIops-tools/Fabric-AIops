@@ -1,10 +1,16 @@
 ---
 name: fabric-aiops
+slug: fabric-aiops
+displayName: "Fabric AIops"
+summary: "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo."
+license: MIT
+homepage: https://github.com/AIops-tools/Fabric-AIops
+tags: [aiops, mcp, governance, fabric]
 description: >
   Use this skill whenever the user needs to operate a network fabric through a controller API — Cisco Meraki Dashboard (full read+write), Cisco Catalyst Center / DNA Center (read subset), Arista CloudVision Portal / CVP (read subset), or UniFi Network (self-hosted controller / UniFi OS console; read subset + device restart) — a one-shot fabric health overview; organization/site/container reads (list/get, licensing, admins, org-wide device statuses, API usage); network reads (list/get, VLANs, health alerts, traffic); device reads (inventory by model MX/MS/MR/MV/MG, status, uplinks, switch ports / interface stats, wireless SSIDs); client reads (list, detail, usage, connectivity); three flagship analyses — uplink loss & latency RCA (rank worst MX WAN uplinks + cause/action), network health score (composite per-network), and config template drift (settings drifted from a bound template); and eight guarded writes (reboot, blink LEDs, update device, update VLAN, claim/remove devices, bind/unbind a config template — Meraki-only except device restart, which unifi also maps; other unmapped writes return a teaching "not supported yet" error).
   Always use this skill for "Meraki org overview", "which uplinks are worst", "uplink loss and latency", "WAN degradation RCA", "network health score", "config template drift", "list Meraki networks/devices/clients", "reboot a Meraki device", "blink device LEDs", "claim a device into a network", "bind a network to a template", "Catalyst Center site health / device health / issues", "DNA Center inventory", "CloudVision inventory / compliance / events", "UniFi site health / alarms / clients", "restart a UniFi AP or switch" when the context is a controller-managed network fabric.
   Do NOT use when the target is OT / industrial equipment (Modbus, OPC-UA, PLCs — use industrial-aiops), a hypervisor, a storage appliance, a backup product, a container/cluster orchestrator, or device-level CLI/SSH network automation (negative routing hints only).
-  Preview — common controller fabric operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). Mock-validated only, not verified against a live controller of any platform.
+  Covers common controller fabric operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). The test suite is mock-based; no platform has yet been exercised against a live controller (see docs/VERIFICATION.md).
 installer:
   kind: uv
   package: fabric-aiops
@@ -13,23 +19,23 @@ allowed-tools:
   - Bash
 metadata: {"openclaw":{"requires":{"env":["FABRIC_AIOPS_CONFIG"],"bins":["fabric-aiops"],"config":["~/.fabric-aiops/config.yaml","~/.fabric-aiops/secrets.enc"]},"optional":{"env":["FABRIC_AIOPS_MASTER_PASSWORD"]},"primaryEnv":"FABRIC_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/Fabric-AIops","emoji":"🛰️","os":["macos","linux"]}}
 compatibility: >
-  Standalone, self-governed network-fabric controller operations (preview). The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry): meraki (Cisco Meraki Dashboard, reference platform, full read+write), catalyst (Cisco Catalyst Center, read subset — sites stand in for organizations/networks), cvp (Arista CloudVision Portal, read subset — containers stand in for organizations/networks), and unifi (UniFi Network controller / UniFi OS console, read subset — sites stand in for organizations/networks — plus the device-restart write via a cmd/devmgr command envelope). Unmapped ops raise a teaching "not supported on <platform> yet" error; all writes are Meraki-only except UniFi device restart.
+  Standalone, self-governed network-fabric controller operations. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry): meraki (Cisco Meraki Dashboard, reference platform, full read+write), catalyst (Cisco Catalyst Center, read subset — sites stand in for organizations/networks), cvp (Arista CloudVision Portal, read subset — containers stand in for organizations/networks), and unifi (UniFi Network controller / UniFi OS console, read subset — sites stand in for organizations/networks — plus the device-restart write via a cmd/devmgr command envelope). Unmapped ops raise a teaching "not supported on <platform> yet" error; all writes are Meraki-only except UniFi device restart.
   All write operations are audited to a local SQLite DB under ~/.fabric-aiops/ (relocatable via FABRIC_AIOPS_HOME).
   Credentials: the controller secret (Meraki API key / Catalyst Center username:password / CVP service-account token / UniFi API key) is stored ENCRYPTED in ~/.fabric-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'fabric-aiops init' to onboard, or 'fabric-aiops secret set <target>' to add one. The store is unlocked by a master password from FABRIC_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var FABRIC_<TARGET_NAME_UPPER>_APIKEY is still honoured as a fallback with a deprecation warning (migrate with 'fabric-aiops secret migrate'). Meraki/CVP/UniFi secrets ride the platform auth header (Authorization: Bearer, X-Cisco-Meraki-API-Key, or UniFi's X-API-KEY) at request time; the Catalyst Center secret is exchanged via POST /dna/system/api/v1/auth/token for a short-lived X-Auth-Token (auto-refreshed once on 401). UniFi legacy cookie login (POST /api/login) is not implemented — use an API key (UniFi OS console or self-hosted Network Server 9.0+; a UniFi OS console's base_url carries the /proxy/network prefix). Secrets are held only in memory and never logged or echoed.
   State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate) and take a dry_run preview. Mutating/reversible writes fetch the real before-state first and record a faithful inverse undo descriptor; irreversible ops (reboot, blink) record only the before-state.
   Webhooks: none — no outbound network calls beyond the configured controller REST API base URL.
   SSL: verify_ssl defaults to true; disable only for a self-signed on-prem controller proxy.
   Transitive dependencies: httpx (HTTP client) and the MCP SDK. No post-install scripts or background services.
-  PREVIEW: mock-validated only; the Dashboard API paths are modelled from the public API shape and need live verification. Community-maintained; not affiliated with or endorsed by Cisco/Meraki — trademarks belong to their owners.
+  Verification status: the test suite is mock-based; the Dashboard API paths are modelled from the public API shape and have not yet been exercised live — docs/VERIFICATION.md defines the checklist. Community-maintained; not affiliated with or endorsed by Cisco/Meraki — trademarks belong to their owners.
 ---
 
-# Fabric AIops (preview)
+# Fabric AIops
 
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, Ubiquiti, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
 
-Governed network-fabric controller operations — **32 MCP tools** over **four platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed network-fabric controller operations — **34 MCP tools** over **four platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
-> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. **Preview / mock-only**: not yet validated against a live controller of any platform.
+> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. The test suite is mock-based; no platform has yet been exercised against a live controller (see `docs/VERIFICATION.md`).
 
 ## Platform support
 
@@ -55,6 +61,8 @@ Ops a platform does not map — and **every write on catalyst/cvp (on unifi, eve
 | **Remediation** | reboot, claim, remove, bind, unbind | 5 | 5 write (high) |
 | | update device, update VLAN | 2 | 2 write (medium) |
 | | blink LEDs | 1 | 1 write (low) |
+| **Undo** | list recorded reversible writes | 1 | 1 read |
+| | apply a recorded inverse (governed, single-use, `dry_run`) | 1 | 1 write (medium) |
 
 `network_health_score` and `config_template_drift` are injected-only (they score data you already hold); `uplink_loss_and_latency_rca` accepts injected `records` for offline analysis, or pulls live from a configured target. Meraki device models carry a product-type prefix: **MX** appliance, **MS** switch, **MR** wireless AP, **MV** camera, **MG** cellular gateway.
 
@@ -90,21 +98,45 @@ fabric-aiops doctor
 
 ## Common Workflows
 
-### Diagnose degraded WAN uplinks
+### "The branch VPN keeps dropping" — diagnose degraded WAN uplinks
 
-1. `fabric-aiops health uplink-rca` → worst MX WAN uplinks ranked by avg loss + latency, each with a likely cause and action
-2. Cross-check the network's device availability: `fabric-aiops org device-statuses` and `fabric-aiops device uplinks`
-3. If a branch is failing over, confirm with `fabric-aiops network alerts <networkId>`
+1. `fabric-aiops health uplink-rca` → worst MX WAN uplinks ranked by avg loss + latency, each citing the measured numbers plus a likely cause and action
+2. `fabric-aiops health uplink-rca --loss-pct 2 --latency-ms 100` → tighten the thresholds if nothing crosses the defaults but users still complain
+3. `fabric-aiops device uplinks` → the raw per-appliance uplink statuses across the org (WAN1/WAN2, active vs failover) behind the ranking — confirm the flagged appliance rather than trusting the summary
+4. `fabric-aiops network alerts <networkId>` → check whether the controller already raised a matching alert (independent corroboration before you touch anything)
+5. **Failure branch**: if the RCA returns no uplink records at all, the org has no appliances reporting uplink telemetry, or the API key lacks org-wide read — run `fabric-aiops doctor` and re-check the org id with `fabric-aiops org list` rather than assuming the WAN is healthy.
 
-### Bring a drifted network back to its template (reversible)
+### Rank the fleet and fix the worst network's device attributes (reversible)
 
-1. Pass the template + bound networks to `config_template_drift` → find the drifted settings
-2. Correct the network, or (for the binding itself) `fabric-aiops remediate bind <networkId> <templateId> --dry-run` → preview the call
-3. Re-run without `--dry-run` (double-confirm) — captures the prior binding and records an inverse (rebind/unbind) undo descriptor
+1. `fabric-aiops overview` → org-level rollup: network count and device status/product mix
+2. `fabric-aiops health score` → composite 0-100 per network, worst first, with every scoring component shown
+3. `fabric-aiops org device-statuses` → find the offline/alerting devices dragging the worst network's score
+4. `fabric-aiops device status <serial>` → confirm the device before changing it
+5. `fabric-aiops remediate update-device <serial> '{"name":"branch-ap-01"}' --dry-run` → preview the exact `PUT /devices/<serial>` call; then run without `--dry-run` (double confirmation). The real before-state is fetched first and recorded as a faithful inverse
+6. **Failure branch**: wrong attribute or wrong device — `fabric-aiops undo list`, then `fabric-aiops undo apply <id>` restores the captured prior attributes. If the write is refused outright, it is the secure-by-default gate: set `FABRIC_AUDIT_APPROVED_BY` and `FABRIC_AUDIT_RATIONALE`, or author a `~/.fabric-aiops/rules.yaml`.
 
-### Offline analysis (no live org)
+### Bring a drifted network back to its config template (reversible)
 
-Pass data straight to the analysis tools — `uplink_loss_and_latency_rca(records=[...])`, `network_health_score(device_statuses=[...])`, or `config_template_drift(template=..., networks=[...])` — to analyse an exported dataset without connecting to a Meraki org.
+1. `fabric-aiops network list` → the networks in scope and their ids
+2. Pass the template plus its bound networks to `config_template_drift(template=..., networks=[...])` → the settings that deviate, per network
+3. `fabric-aiops network vlans <networkId>` → confirm the drifted VLAN's current values before changing anything
+4. Fix the specific setting — `fabric-aiops remediate update-vlan <networkId> <vlanId> '{"name":"data"}' --dry-run`, then for real — or re-establish the binding itself: `fabric-aiops remediate bind <networkId> <templateId> --dry-run`, then without `--dry-run` (double confirmation). Both capture the real before-state and record an inverse descriptor (for `bind`, the inverse is unbind or a rebind to the prior template)
+5. **Failure branch**: if the rebind makes things worse, `fabric-aiops undo apply <id>` returns the network to its captured prior binding; `fabric-aiops remediate unbind <networkId>` is the manual escape hatch. Re-run `config_template_drift` to confirm the drift actually cleared instead of trusting the write's success message.
+
+### Stage a replacement device into a branch network
+
+1. `fabric-aiops device inventory` → confirm the replacement serial is in the org inventory and unassigned
+2. `fabric-aiops network get <networkId>` → confirm the target network
+3. `fabric-aiops remediate claim <networkId> <serial> --dry-run` → preview `POST /networks/<networkId>/devices/claim`; then run for real (double confirmation) — the inverse (remove from network) is recorded
+4. `fabric-aiops remediate blink-leds <serial> --duration 30` → low-risk physical confirmation that you are at the right box in the rack
+5. `fabric-aiops health score` → confirm the network's score recovers once the device reports in
+6. **Failure branch**: wrong network — `fabric-aiops undo apply <id>` or `fabric-aiops remediate remove <networkId> <serial>`. Note `fabric-aiops remediate reboot <serial>` is `no undo` by construction (a reboot has no safe inverse); it records only the before-state, so use it last, not as a first response.
+
+### Offline analysis (no live controller)
+
+1. Export the org's uplink, device-status, and template data to JSON
+2. Feed it straight to the analysis tools — `uplink_loss_and_latency_rca(records=[...])`, `network_health_score(device_statuses=[...])`, `config_template_drift(template=..., networks=[...])` — no connection or credentials required
+3. **Failure branch**: a tool that rejects the injected records means the export is missing fields the analysis needs (loss/latency samples, device status, template settings) — re-export rather than hand-editing, so the findings stay traceable to the controller.
 
 ## Governance & Safety
 

@@ -1,8 +1,8 @@
 # fabric-aiops CLI reference
 
-> Preview / mock-only. Controller API paths (Meraki / Catalyst Center / CVP /
-> UniFi Network) are modelled from the public API shapes and need live
-> verification. Not affiliated with Cisco/Meraki/Arista/Ubiquiti.
+> Controller API paths (Meraki / Catalyst Center / CVP / UniFi Network) are
+> modelled from the public API shapes and have not yet been exercised live
+> (see docs/VERIFICATION.md). Not affiliated with Cisco/Meraki/Arista/Ubiquiti.
 
 ## Setup & diagnostics
 

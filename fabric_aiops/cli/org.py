@@ -6,7 +6,16 @@ import json
 
 import typer
 
-from fabric_aiops.cli._common import OrgOption, TargetOption, cli_errors, console, get_connection
+from fabric_aiops.cli._common import (
+    LimitOption,
+    OrgOption,
+    TargetOption,
+    cli_errors,
+    console,
+    get_connection,
+    limit_kwargs,
+    print_result,
+)
 
 org_app = typer.Typer(
     name="org",
@@ -57,12 +66,14 @@ def org_admins(org_id: OrgOption = None, target: TargetOption = None) -> None:
 
 @org_app.command("device-statuses")
 @cli_errors
-def org_device_statuses(org_id: OrgOption = None, target: TargetOption = None) -> None:
+def org_device_statuses(
+    org_id: OrgOption = None, limit: LimitOption = None, target: TargetOption = None
+) -> None:
     """Org-wide device availability rolled up by status and product type."""
     from fabric_aiops.ops import organizations as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.device_statuses(conn, org_id)))
+    print_result(ops.device_statuses(conn, org_id, **limit_kwargs(limit)))
 
 
 @org_app.command("api-usage")

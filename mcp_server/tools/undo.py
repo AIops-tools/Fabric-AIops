@@ -16,7 +16,7 @@ design, inverses in this line key off ids/names, not credentials.
 import json
 from typing import Any, Optional
 
-from fabric_aiops.governance import governed_tool
+from fabric_aiops.governance import governed_tool, opt_str
 from fabric_aiops.governance.undo import get_undo_store
 from mcp_server._shared import mcp, tool_errors
 
@@ -36,20 +36,29 @@ def undo_list(limit: int = 50, target: Optional[str] = None) -> dict:
     Each entry names the original tool, the inverse tool that ``undo_apply``
     would run, and a human note. Use the ``undoId`` with ``undo_apply``.
 
+    One extra row is fetched so ``truncated`` is **measured**, not guessed from
+    the returned count happening to equal the limit — a capped list that cannot
+    say "there is more" invites a weak model to report it as the whole story.
+
     Args:
         limit: Max rows to return (default 50).
         target: Unused (undo state is host-local); accepted for CLI uniformity.
     """
-    rows = get_undo_store().list(status="recorded", limit=max(1, min(limit, 500)))
+    capped = max(1, min(limit, 500))
+    fetched = get_undo_store().list(status="recorded", limit=capped + 1)
+    rows = fetched[:capped]
     return {
         "count": len(rows),
+        "returned": len(rows),
+        "limit": capped,
+        "truncated": len(fetched) > capped,
         "undos": [
             {
                 "undoId": r["undo_id"],
                 "ts": r["ts"],
                 "originalTool": r["tool"],
                 "inverseTool": r["undo_tool"],
-                "note": r.get("note", ""),
+                "note": opt_str(r.get("note")),
             }
             for r in rows
         ],

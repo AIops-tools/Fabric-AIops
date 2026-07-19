@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
@@ -22,6 +23,9 @@ OrgOption = Annotated[
 ]
 DryRunOption = Annotated[
     bool, typer.Option("--dry-run", help="Print the API call without executing")
+]
+LimitOption = Annotated[
+    int | None, typer.Option("--limit", help="Max rows to return (result says if truncated)")
 ]
 
 
@@ -59,6 +63,28 @@ def get_connection(target: str | None, config_path: Path | None = None) -> tuple
     cfg = load_config(config_path)
     mgr = ConnectionManager(cfg)
     return mgr.connect(target), cfg
+
+
+def print_result(result: Any) -> None:
+    """Print a read result as JSON, and say so out loud when it was truncated.
+
+    A capped list that does not announce the cut reads as the whole story — to a
+    person skimming, and especially to a smaller local model, which will happily
+    summarise a partial result as complete. So whenever the ops layer reports
+    ``truncated``, the CLI prints an explicit line telling the operator to
+    re-run with a higher --limit.
+    """
+    console.print_json(json.dumps(result))
+    if isinstance(result, dict) and result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} row(s) — "
+            f"re-run with a higher --limit to see the rest.[/]"
+        )
+
+
+def limit_kwargs(limit: int | None) -> dict:
+    """``{"limit": n}`` when the operator passed --limit, else ``{}`` (use the default)."""
+    return {} if limit is None else {"limit": limit}
 
 
 def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = None) -> None:

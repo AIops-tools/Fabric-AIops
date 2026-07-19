@@ -1,6 +1,6 @@
 # fabric-aiops capabilities
 
-> Preview / mock-only. 32 MCP tools (24 read, 8 write) over four platforms —
+> 34 MCP tools (25 read, 9 write) over four platforms —
 > Cisco Meraki Dashboard (reference, full read+write), Cisco Catalyst Center
 > (read subset), Arista CloudVision Portal (read subset), UniFi Network (read
 > subset + device restart). All API paths are modelled from the public API
@@ -37,10 +37,10 @@ unifi, every write except reboot)** — returns a teaching "not supported on
 <platform> yet — open an issue or PR" error instead of a silent no-op. The
 full per-op matrix is in the repo README.
 
-## Read tools (24)
+## Read tools (25)
 
 ### Overview + organizations
-| Tool | Meraki API (preview) | Returns |
+| Tool | Meraki API path | Returns |
 |------|----------------------|---------|
 | `overview` | `/organizations/{id}/networks` + `/devices/statuses` | organizationId, networks, devicesTotal, devicesByStatus, devicesByProductType |
 | `org_list` | `GET /organizations` | id, name, url, apiEnabled |
@@ -51,7 +51,7 @@ full per-op matrix is in the repo README.
 | `org_api_requests` | `GET /organizations/{id}/apiRequests/overview` | totalRequests, rateLimited429, responseCodeCounts |
 
 ### Networks
-| Tool | Meraki API (preview) | Returns |
+| Tool | Meraki API path | Returns |
 |------|----------------------|---------|
 | `network_list` | `GET /organizations/{id}/networks` | id, name, productTypes, tags |
 | `network_get` | `GET /networks/{id}` | one network detail |
@@ -60,7 +60,7 @@ full per-op matrix is in the repo README.
 | `network_traffic` | `GET /networks/{id}/traffic` | applicationCount, topApplications[] (by bytes) |
 
 ### Devices
-| Tool | Meraki API (preview) | Returns |
+| Tool | Meraki API path | Returns |
 |------|----------------------|---------|
 | `device_inventory` | `GET /organizations/{id}/devices` | total, byModelFamily, matched, devices[] (filterable by model) |
 | `device_status` | `GET /organizations/{id}/devices/statuses` | one device's status row |
@@ -69,7 +69,7 @@ full per-op matrix is in the repo README.
 | `wireless_ssids` | `GET /networks/{id}/wireless/ssids` | MR SSIDs (number, name, enabled) |
 
 ### Clients
-| Tool | Meraki API (preview) | Returns |
+| Tool | Meraki API path | Returns |
 |------|----------------------|---------|
 | `client_list` | `GET /networks/{id}/clients` | clients seen in the window |
 | `client_get` | `GET /networks/{id}/clients/{clientId}` | description, MAC, IP, VLAN, manufacturer |
@@ -88,9 +88,14 @@ live from a `target`/`org_id`. `network_health_score` and `config_template_drift
 are injected-only (they score data you already hold, e.g. from
 `org_device_statuses` / `device_uplinks`).
 
-## Write tools (8) — all support `dry_run`; CLI adds double-confirm
+### Undo
+| Tool | Meraki API path | Returns |
+|------|----------------------|---------|
+| `undo_list` | _(local `undo.db`, no API call)_ | recorded, not-yet-applied reversible writes: undoId, original tool, inverse tool, note |
 
-| Tool | Risk | Meraki API (preview) | Undo / safety |
+## Write tools (9) — all support `dry_run`; CLI adds double-confirm
+
+| Tool | Risk | Meraki API path | Undo / safety |
 |------|------|----------------------|---------------|
 | `reboot_device` | **high** | `POST /devices/{serial}/reboot` (unifi: `POST /api/s/{site}/cmd/devmgr` `{"cmd": "restart-device", "mac": ...}`) | captures prior status; no safe inverse, no undo |
 | `claim_devices_into_network` | **high** | `POST /networks/{id}/devices/claim` | inverse = remove the claimed serials |
@@ -100,6 +105,7 @@ are injected-only (they score data you already hold, e.g. from
 | `update_device` | medium | `PUT /devices/{serial}` | fetches + captures the changed keys' prior values; inverse = restore them |
 | `update_network_vlan` | medium | `PUT /networks/{id}/appliance/vlans/{vlanId}` | fetches + captures prior values; inverse = restore them |
 | `blink_device_leds` | low | `POST /devices/{serial}/blinkLeds` | locator aid; no config change, no undo |
+| `undo_apply` | medium | _(local `undo.db`, then dispatches the recorded inverse tool)_ | executes a recorded inverse — itself governed and audited, single-use |
 
 ## Out of scope (by design)
 

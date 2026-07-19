@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.AIops-tools/fabric-aiops",
   "title": "Fabric AIops",
-  "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 32 tools with audit/undo.",
+  "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo.",
   "repository": {
     "url": "https://github.com/AIops-tools/Fabric-AIops",
     "source": "github"
   },
-  "version": "0.4.0",
+  "version": "0.5.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "fabric-aiops",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "transport": {
         "type": "stdio"
       }
