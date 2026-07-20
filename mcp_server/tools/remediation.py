@@ -4,7 +4,14 @@ The only state-changing tools in the package. Every one is wrapped with the
 governance harness (audit + graduated approval tier) and takes a ``dry_run``
 preview. Reversible writes pass an ``undo=`` callback that turns the fetched
 before-state into an inverse descriptor the harness records; irreversible ones
-(reboot, blink) record none.
+(reboot, blink) record none. An undo builder that cannot verify what it would
+be restoring declines (returns None) rather than record a token whose replay
+would report success having restored nothing.
+
+``bind_network_to_template`` additionally REFUSES outright when the bind would
+overwrite local VLANs this tool cannot recreate. The refusal check is a read
+and runs on the preview path too, so ``dry_run=True`` never shows green for a
+bind the real call would refuse.
 
 Risk tiers: reboot / claim / remove / bind / unbind = high (destructive or
 fleet-affecting); update_device / update_network_vlan = medium (mutating,
@@ -76,21 +83,35 @@ def _remove_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
 
 
 def _bind_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
+    """Inverse of a bind — offered only where it really restores something.
+
+    Binding overwrites the network's VLAN / firewall configuration with the
+    template's, and unbinding does not put the old configuration back. So the
+    unbind branch is offered only when the prior VLAN set was actually read and
+    found empty; when it could not be read this declines (None) rather than
+    hand back a token whose replay would report success having restored nothing.
+    """
     if not isinstance(result, dict):
         return None
-    prior_template = (result.get("priorState") or {}).get("configTemplateId")
+    prior = result.get("priorState") or {}
+    prior_template = prior.get("configTemplateId")
     if prior_template:
         return {
             "tool": "bind_network_to_template",
             "params": {"network_id": params.get("network_id"), "template_id": prior_template},
             "skill": "fabric-aiops",
-            "note": "Inverse of bind: rebind to the template that was bound before.",
+            "note": "Inverse of bind: rebind to the template that was bound before. The "
+            "configuration was template-derived both before and after, so this restores it.",
         }
+    if prior.get("vlanCapture") != ops.VLAN_CAPTURE_CAPTURED:
+        return None  # prior local configuration unverified → claim no restoration
     return {
         "tool": "unbind_network_from_template",
         "params": {"network_id": params.get("network_id")},
         "skill": "fabric-aiops",
-        "note": "Inverse of bind: unbind (the network had no template before).",
+        "note": "Inverse of bind: unbind (the network had no template and no local VLANs "
+        "before). Restores the binding state only — per-network firewall rules, group "
+        "policies and static routes are not restored.",
     }
 
 
@@ -248,9 +269,15 @@ def remove_device_from_network(
 ) -> dict:
     """[WRITE][risk=high] Remove device(s) from a network. Inverse: claim back.
 
-    The devices' current network is captured for undo (claim back). Pass
-    dry_run=True to preview. Accepts a single ``serial`` or a ``serials`` list —
-    the list form is how claim_devices_into_network's undo descriptor replays.
+    The devices' current network is captured for undo, so the undo token is
+    genuinely applicable — but claiming a device back restores MEMBERSHIP, not
+    CONFIGURATION. A removed device is reset to an unconfigured state; it
+    returns with the network's defaults, without the name, tags, address, notes
+    or switch-port settings it carried before. Read those with device_status /
+    switch_ports first if you will need them back.
+
+    Pass dry_run=True to preview. Accepts a single ``serial`` or a ``serials``
+    list — the list form is how claim_devices_into_network's undo replays.
 
     Args:
         network_id: Meraki network id the devices are bound to.
@@ -290,9 +317,19 @@ def bind_network_to_template(
 ) -> dict:
     """[WRITE][risk=high] Bind a network to a config template, capturing prior binding.
 
-    Captures any template the network was already bound to, so undo rebinds to
-    the prior template (or unbinds when there was none). Pass dry_run=True to
-    preview.
+    REFUSES when the network is unbound and carries local VLANs: the bind
+    overwrites them with the template's, unbinding does not put them back, and
+    this tool has no VLAN-create operation — so the undo would report success
+    having restored nothing.
+
+    Undo, precisely: rebind to the prior template when there was one (a faithful
+    restore — the configuration was template-derived either way); unbind when
+    the network was unbound with a VERIFIED empty VLAN set (restores the binding
+    state only, NOT firewall rules / group policies / static routes); and NO
+    undo at all when the prior VLAN set could not be read.
+
+    Pass dry_run=True to preview. The preview runs the same refusal check
+    (reads only), so it never previews green a bind the real call would refuse.
 
     Args:
         network_id: Meraki network id to bind.
@@ -302,8 +339,14 @@ def bind_network_to_template(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    capture = ops.guard_bind_network_to_template(conn, network_id)
     if dry_run:
-        return {"dryRun": True, "wouldBind": {"networkId": network_id, "templateId": template_id}}
+        return {
+            "dryRun": True,
+            "wouldBind": {"networkId": network_id, "templateId": template_id},
+            "priorState": capture,
+            "reversible": ops.bind_is_reversible(capture),
+        }
     return ops.bind_network_to_template(conn, network_id, template_id, auto_bind)
 
 

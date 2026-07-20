@@ -43,8 +43,11 @@ def _audit_tools(db_path) -> list[str]:
 def _mock_conn() -> MagicMock:
     conn = MagicMock(name="conn")
     conn.target = TargetConfig(name="t")  # real meraki descriptor, org_id=""
+    # configTemplateId is set: bind's guard then takes the already-bound branch
+    # (config template-derived both sides) and needs no VLAN read from this
+    # deliberately simple mock, which answers every GET with the same record.
     conn.get.return_value = {
-        "serial": "Q2", "status": "online", "name": "n", "configTemplateId": None,
+        "serial": "Q2", "status": "online", "name": "n", "configTemplateId": "T-old",
     }
     conn.post.return_value = {}
     conn.put.return_value = {}

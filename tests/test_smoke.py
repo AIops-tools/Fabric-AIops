@@ -195,7 +195,7 @@ def test_update_device_records_undo_token_via_harness(monkeypatch):
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["descriptor"] = undo_descriptor
             return "undo-42"
 
@@ -237,7 +237,7 @@ def test_bind_undo_rebinds_to_prior_template(monkeypatch):
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["d"] = undo_descriptor
             return "u1"
 

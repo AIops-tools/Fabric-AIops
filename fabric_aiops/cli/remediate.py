@@ -21,6 +21,7 @@ from fabric_aiops.cli._common import (
     double_confirm,
     dry_run_print,
 )
+from fabric_aiops.ops import remediation as rem_ops
 
 remediate_app = typer.Typer(
     name="remediate",
@@ -172,8 +173,16 @@ def bind(
     target: TargetOption = None,
     dry_run: DryRunOption = False,
 ) -> None:
-    """Bind a network to a config template (captures before-state; dry-run + confirm)."""
+    """Bind a network to a config template (captures before-state; dry-run + confirm).
+
+    Refuses when the bind would overwrite local VLANs this tool cannot restore.
+    """
+    from mcp_server.tools import remediation as gov
+
     if dry_run:
+        # The refusal check reads only, so running it here means --dry-run can
+        # never preview green a bind the confirmed run would refuse.
+        rem_ops.guard_bind_network_to_template(gov._get_connection(target), network_id)
         dry_run_print(
             operation="bind_network_to_template",
             api_call=f"POST /networks/{network_id}/bind",
@@ -181,7 +190,6 @@ def bind(
         )
         return
     double_confirm(f"bind to template {template_id}", network_id)
-    from mcp_server.tools import remediation as gov
 
     console.print_json(
         json.dumps(

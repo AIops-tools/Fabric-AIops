@@ -140,8 +140,13 @@ def test_bind_undo_rebinds_prior_or_unbinds_when_none():
     assert rebind["tool"] == "bind_network_to_template"
     assert rebind["params"]["template_id"] == "T0"
 
-    # No prior template → the inverse of bind is to unbind.
-    unbind = gov._bind_undo({"network_id": "N1"}, {"priorState": {"configTemplateId": None}})
+    # No prior template, and the VLAN set was READ and found empty → the
+    # inverse of bind is to unbind. (Without that verification it declines —
+    # see test_bind_undo_declines_when_prior_vlans_unverified.)
+    unbind = gov._bind_undo(
+        {"network_id": "N1"},
+        {"priorState": {"configTemplateId": None, "vlans": [], "vlanCapture": "captured"}},
+    )
     assert unbind["tool"] == "unbind_network_from_template"
     assert unbind["params"] == {"network_id": "N1"}
 
