@@ -4,6 +4,21 @@ Real writes are delegated to the ``@governed_tool``-decorated functions in
 ``mcp_server.tools.remediation`` so every CLI write is audited, budget-counted,
 risk-tiered and undo-recorded by the governance harness — the same path the MCP
 tools take. The dry-run preview and double-confirm gate stay in the CLI.
+
+Every governed result goes through ``governed()``, which turns the ``{"error":
+...}`` envelope ``@tool_errors`` produces into exit code 1. Printing a refusal
+and exiting 0 tells a CI job or a shell ``&&`` chain that a blocked write
+landed — the write is stopped either way, but the exit code is what a caller
+actually branches on.
+
+``--dry-run`` runs the SAME governed twin with ``dry_run=True`` rather than
+printing a hand-written guess. Three things follow. Every guard the real call
+would hit — a platform that does not map the write, a bind that would destroy
+its own undo — fires on the preview too, and reaches the operator as a refusal
+with exit code 1 instead of a green banner. The preview lands the same audit
+row the MCP preview always did; the CLI skipping it was the outlier. And the
+banner's parameters are the twin's own resolved values, so they cannot drift
+from what the command actually does.
 """
 
 from __future__ import annotations
@@ -20,8 +35,8 @@ from fabric_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_print,
+    governed,
 )
-from fabric_aiops.ops import remediation as rem_ops
 
 remediate_app = typer.Typer(
     name="remediate",
@@ -37,13 +52,18 @@ NetIdArg = Annotated[str, typer.Argument(help="Network id")]
 @cli_errors
 def reboot(serial: SerialArg, target: TargetOption = None, dry_run: DryRunOption = False) -> None:
     """Reboot a device (no undo; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="reboot_device", api_call=f"POST /devices/{serial}/reboot")
-        return
-    double_confirm("reboot", serial)
     from mcp_server.tools import remediation as gov
 
-    console.print_json(json.dumps(gov.reboot_device(serial=serial, target=target)))
+    if dry_run:
+        preview = governed(gov.reboot_device(serial=serial, dry_run=True, target=target))
+        dry_run_print(
+            operation="reboot_device",
+            api_call=f"POST /devices/{serial}/reboot",
+            parameters=preview.get("wouldReboot", {}),
+        )
+        return
+    double_confirm("reboot", serial)
+    console.print_json(json.dumps(governed(gov.reboot_device(serial=serial, target=target))))
 
 
 @remediate_app.command("blink-leds")
@@ -57,7 +77,7 @@ def blink_leds(
     from mcp_server.tools import remediation as gov
 
     console.print_json(
-        json.dumps(gov.blink_device_leds(serial=serial, duration=duration, target=target))
+        json.dumps(governed(gov.blink_device_leds(serial=serial, duration=duration, target=target)))
     )
 
 
@@ -70,16 +90,23 @@ def update_device(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update device attributes (captures before-state; dry-run + confirm)."""
+    from mcp_server.tools import remediation as gov
+
     attrs = json.loads(attrs_json)
     if dry_run:
+        preview = governed(
+            gov.update_device(serial=serial, attrs=attrs, dry_run=True, target=target)
+        )
         dry_run_print(
-            operation="update_device", api_call=f"PUT /devices/{serial}", parameters=attrs
+            operation="update_device",
+            api_call=f"PUT /devices/{serial}",
+            parameters=preview.get("wouldUpdate", {}).get("attrs", attrs),
         )
         return
     double_confirm("update attributes on", serial)
-    from mcp_server.tools import remediation as gov
-
-    console.print_json(json.dumps(gov.update_device(serial=serial, attrs=attrs, target=target)))
+    console.print_json(
+        json.dumps(governed(gov.update_device(serial=serial, attrs=attrs, target=target)))
+    )
 
 
 @remediate_app.command("update-vlan")
@@ -92,21 +119,28 @@ def update_vlan(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update an appliance VLAN (captures before-state; dry-run + confirm)."""
+    from mcp_server.tools import remediation as gov
+
     attrs = json.loads(attrs_json)
     if dry_run:
+        preview = governed(
+            gov.update_network_vlan(
+                network_id=network_id, vlan_id=vlan_id, attrs=attrs, dry_run=True, target=target
+            )
+        )
         dry_run_print(
             operation="update_network_vlan",
             api_call=f"PUT /networks/{network_id}/appliance/vlans/{vlan_id}",
-            parameters=attrs,
+            parameters=preview.get("wouldUpdate", {}).get("attrs", attrs),
         )
         return
     double_confirm(f"update VLAN {vlan_id} on", network_id)
-    from mcp_server.tools import remediation as gov
-
     console.print_json(
         json.dumps(
-            gov.update_network_vlan(
-                network_id=network_id, vlan_id=vlan_id, attrs=attrs, target=target
+            governed(
+                gov.update_network_vlan(
+                    network_id=network_id, vlan_id=vlan_id, attrs=attrs, target=target
+                )
             )
         )
     )
@@ -121,19 +155,28 @@ def claim(
     dry_run: DryRunOption = False,
 ) -> None:
     """Claim devices into a network (dry-run + confirm)."""
+    from mcp_server.tools import remediation as gov
+
     if dry_run:
+        preview = governed(
+            gov.claim_devices_into_network(
+                network_id=network_id, serials=serials, dry_run=True, target=target
+            )
+        )
         dry_run_print(
             operation="claim_devices_into_network",
             api_call=f"POST /networks/{network_id}/devices/claim",
-            parameters={"serials": serials},
+            parameters=preview.get("wouldClaim", {}),
         )
         return
     double_confirm(f"claim {len(serials)} device(s) into", network_id)
-    from mcp_server.tools import remediation as gov
-
     console.print_json(
         json.dumps(
-            gov.claim_devices_into_network(network_id=network_id, serials=serials, target=target)
+            governed(
+                gov.claim_devices_into_network(
+                    network_id=network_id, serials=serials, target=target
+                )
+            )
         )
     )
 
@@ -147,19 +190,28 @@ def remove(
     dry_run: DryRunOption = False,
 ) -> None:
     """Remove a device from a network (dry-run + confirm)."""
+    from mcp_server.tools import remediation as gov
+
     if dry_run:
+        preview = governed(
+            gov.remove_device_from_network(
+                network_id=network_id, serial=serial, dry_run=True, target=target
+            )
+        )
         dry_run_print(
             operation="remove_device_from_network",
             api_call=f"POST /networks/{network_id}/devices/remove",
-            parameters={"serial": serial},
+            parameters=preview.get("wouldRemove", {}),
         )
         return
     double_confirm(f"remove device {serial} from", network_id)
-    from mcp_server.tools import remediation as gov
-
     console.print_json(
         json.dumps(
-            gov.remove_device_from_network(network_id=network_id, serial=serial, target=target)
+            governed(
+                gov.remove_device_from_network(
+                    network_id=network_id, serial=serial, target=target
+                )
+            )
         )
     )
 
@@ -180,21 +232,41 @@ def bind(
     from mcp_server.tools import remediation as gov
 
     if dry_run:
-        # The refusal check reads only, so running it here means --dry-run can
-        # never preview green a bind the confirmed run would refuse.
-        rem_ops.guard_bind_network_to_template(gov._get_connection(target), network_id)
+        # Through the governed twin, which runs the refusal check (a read) before
+        # it previews: --dry-run can never show green for a bind the confirmed
+        # run would refuse. ``reversible`` is the twin's own verdict on whether
+        # an undo could restore this network, which is the fact worth knowing
+        # BEFORE binding, not after.
+        preview = governed(
+            gov.bind_network_to_template(
+                network_id=network_id,
+                template_id=template_id,
+                auto_bind=auto_bind,
+                dry_run=True,
+                target=target,
+            )
+        )
         dry_run_print(
             operation="bind_network_to_template",
             api_call=f"POST /networks/{network_id}/bind",
-            parameters={"configTemplateId": template_id, "autoBind": auto_bind},
+            parameters={
+                "configTemplateId": template_id,
+                "autoBind": auto_bind,
+                "reversible": preview.get("reversible"),
+            },
         )
         return
     double_confirm(f"bind to template {template_id}", network_id)
 
     console.print_json(
         json.dumps(
-            gov.bind_network_to_template(
-                network_id=network_id, template_id=template_id, auto_bind=auto_bind, target=target
+            governed(
+                gov.bind_network_to_template(
+                    network_id=network_id,
+                    template_id=template_id,
+                    auto_bind=auto_bind,
+                    target=target,
+                )
             )
         )
     )
@@ -208,15 +280,21 @@ def unbind(
     dry_run: DryRunOption = False,
 ) -> None:
     """Unbind a network from its config template (captures before-state; dry-run + confirm)."""
+    from mcp_server.tools import remediation as gov
+
     if dry_run:
+        preview = governed(
+            gov.unbind_network_from_template(
+                network_id=network_id, dry_run=True, target=target
+            )
+        )
         dry_run_print(
             operation="unbind_network_from_template",
             api_call=f"POST /networks/{network_id}/unbind",
+            parameters=preview.get("wouldUnbind", {}),
         )
         return
     double_confirm("unbind from its config template", network_id)
-    from mcp_server.tools import remediation as gov
-
     console.print_json(
-        json.dumps(gov.unbind_network_from_template(network_id=network_id, target=target))
+        json.dumps(governed(gov.unbind_network_from_template(network_id=network_id, target=target)))
     )

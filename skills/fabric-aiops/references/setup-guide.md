@@ -104,12 +104,23 @@ export FABRIC_AIOPS_MASTER_PASSWORD='your-master-password'
   exception text and tracebacks are scrubbed of secret-shaped strings before
   being written to the audit log.
 
+## Audit-annotation env vars (optional)
+
+The skill does not decide whether a write is permitted — that is the agent's
+judgement or the connecting controller account's role. If you want the audit
+trail to record *who* ran a destructive op and *why*, set these; they are
+recorded on the row, never required, and gate nothing:
+
+```bash
+export FABRIC_AUDIT_APPROVED_BY='you@example.com'
+export FABRIC_AUDIT_RATIONALE='why this destructive op is justified'
+```
+
 ## Governance harness state
 
 State lives under `~/.fabric-aiops/` (relocate with `FABRIC_AIOPS_HOME`):
 
-- `audit.db` — every tool call (SQLite), with risk tier, approver, rationale
-- `rules.yaml` — policy: deny rules, maintenance windows, approval tiers
+- `audit.db` — every tool call (SQLite), with risk tier and any approver/rationale
 - `undo.db` — inverse descriptors for reversible writes (e.g. `update_device`,
   `bind_network_to_template`)
 - budget / runaway guard — caps cumulative tool calls and wall-time; trips on

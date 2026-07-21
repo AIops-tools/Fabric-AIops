@@ -33,9 +33,8 @@ exactly what a live run tests. Record which platform you verified.
   connection; `reboot_device` and `blink_device_leds` declare no undo.
 - Agent-supplied ids (org / network / serial / VLAN) are percent-encoded before
   entering a URL path.
-- Governance persistence: audited rows land in the SQLite audit DB, and the
-  secure-by-default approver gate refuses high-risk writes with no `rules.yaml`
-  and no `FABRIC_AUDIT_APPROVED_BY`.
+- Governance persistence: audited rows land in the SQLite audit DB. The harness
+  authorizes nothing — there is no read-only, deny-rule, or approver gate to test.
 
 What it does **not** guarantee: that the controller API paths, response field
 names, pagination, rate-limit behaviour, and auth handshakes match a real
@@ -141,10 +140,11 @@ error confirmed instead (section 6).
 - [ ] On `unifi`, `remediate reboot` works (the one mapped write) while the other
       writes return the teaching error.
 
-### 7. Governance actually gates
-- [ ] With no `~/.fabric-aiops/rules.yaml`, a high-risk write is refused unless
-      `FABRIC_AUDIT_APPROVED_BY` names an approver (secure-by-default); with it
-      set, the approver and `FABRIC_AUDIT_RATIONALE` appear in the audit row.
+### 7. Audit is unbypassable — both entry points
+- [ ] Run a `high`-risk write (e.g. `remediate reboot`, `remediate bind`) over MCP
+      and the same op over the CLI; confirm **both** land a row in `audit.db`, and
+      that `FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE`, when set, appear on
+      the row (recorded, never required — the skill authorizes nothing).
 - [ ] A tight poll loop trips the runaway budget guard rather than burning the
       controller's API rate limit.
 - [ ] Relocation works: with `FABRIC_AIOPS_HOME` set, `audit.db`, the undo store,

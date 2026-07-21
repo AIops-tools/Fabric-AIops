@@ -10,8 +10,8 @@ Governed AI-ops for **network fabrics** managed through a controller — the
 CloudVision Portal (CVP)** (read subset), and **UniFi Network** (self-hosted
 controller or UniFi OS console; read subset + device restart) — with a
 **built-in governance
-harness**: unified audit log, policy engine, token/runaway budget guard,
-undo-token recording, and graduated-autonomy risk tiers. **Multi-platform by
+harness**: unified audit log, token/runaway budget guard,
+undo-token recording, and descriptive risk tiers. **Multi-platform by
 construction**: a registry keyed by `platform` maps every *canonical operation*
 onto each controller's REST API (path templates + response adapters), so adding
 a controller is a registry entry, never new ops/CLI/MCP surface. An operation a
@@ -120,45 +120,26 @@ of secret; `fabric-aiops doctor` probes each target with the canonical
 top-of-hierarchy read (organizations / sites / containers / UniFi sites),
 exercising the full auth flow.
 
-## Security: read-only mode
+## What this tool does, and does not, decide
 
-This tool is meant to be handed to an AI agent, so its safety story is enforced
-by the server rather than requested in a prompt:
+It delivers network-fabric operations — reads and writes — accurately and
+efficiently, and records every one of them. It does **not** decide whether a
+write is allowed to happen. That is the agent's judgement, or the permission of
+the account you connect it with: give it a Meraki API key whose admin has
+read-only organization access (or the read-only equivalent on your controller)
+and the writes fail at the controller — the place that actually owns the
+permission.
 
-```bash
-export FABRIC_READ_ONLY=1
-```
+So there is no read-only switch, no policy file, no approval gate to configure.
+The one thing the tool guarantees is that nothing is silent: **every call, over
+MCP and over the CLI alike, lands an audit row** in `~/.fabric-aiops/audit.db`,
+and mutating writes still capture their before-state and record an inverse where
+one exists.
 
-With that set, the **9 write tools are never registered**. An MCP client
-lists **25 tools instead of 34** — the writes are not hidden, not
-gated behind a flag, and not merely refused when called. They are absent from
-the session. A model cannot invoke a tool it was never offered, and cannot be
-argued into one.
-
-That distinction is the whole point. A tool that exists but refuses still invites
-retry loops and "I'll describe the call instead" behaviour from smaller models,
-and it leaves a reviewer trusting a promise. An absent tool is a fact you can
-check: connect, list the tools, and see that the writes are not there.
-
-Enforcement is two layers deep, so the switch cannot be sidestepped by changing
-entry point:
-
-| Layer | What it does | Covers |
-|---|---|---|
-| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
-| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
-
-Read operations are unaffected, and every call is still audited to
-`~/.fabric-aiops/audit.db`.
-
-> The read/write split is derived from each tool's declared `risk_level`, and a
-> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
-> tool's own documentation — so a write can't quietly present itself as a read.
-
-Running a smaller / local model? See
-[agent-guardrails.md](skills/fabric-aiops/references/agent-guardrails.md) — it lists
-the guardrails this tool now enforces for you (so you don't spend prompt budget
-restating them) and gives a ready-made system prompt for what's left.
+> Each tool declares a `risk_level`, kept in agreement with its `[READ]`/`[WRITE]`
+> documentation tag by a test, and carried into the audit row as a descriptive
+> tier — so a reviewer can see at a glance that a row was a high-risk delete. It
+> is a label, not a gate.
 
 ## Quick start
 
@@ -180,17 +161,21 @@ fabric-aiops-mcp
 
 ## Governance
 
-Every MCP tool passes through the bundled `@governed_tool` harness:
+Every operation — MCP **and** CLI — passes through the bundled `@governed_tool`
+harness. It records; it does not authorize (see above).
 
-- **Audit** — every call (params, result, status, duration, risk tier, approver,
-  rationale) is logged to `~/.fabric-aiops/audit.db` (relocatable via
-  `FABRIC_AIOPS_HOME`).
-- **Budget / runaway guard** — token and call budgets trip a circuit breaker.
-- **Risk tiers** — graduated autonomy; high-risk ops can require a named approver
-  (`FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE` — the env-var names
-  the bundled harness reads).
+- **Audit** — every call (params, result, status, duration, risk tier, and any
+  operator-supplied approver/rationale) is logged to `~/.fabric-aiops/audit.db`
+  (relocatable via `FABRIC_AIOPS_HOME`). The CLI writes the same row the MCP path
+  does — there is no unaudited entry point.
+- **Runaway guard** — a safety backstop, not an authorization gate: the same
+  call hammered in a tight loop trips a circuit breaker so a stuck agent can't
+  burn unbounded calls/time. Disable with `FABRIC_RUNAWAY_MAX=0`; optional hard
+  ceilings via `FABRIC_MAX_TOOL_CALLS` / `FABRIC_MAX_TOOL_SECONDS`.
 - **Undo recording** — reversible writes record an inverse descriptor built from
   the fetched before-state.
+- **Risk tier** — a descriptive label on the audit row derived from
+  `risk_level`; it gates nothing.
 
 ## Scope
 

@@ -30,10 +30,18 @@ LimitOption = Annotated[
 
 
 def _cli_error_types() -> tuple[type[BaseException], ...]:
-    """Exceptions translated to a one-line teaching error instead of a traceback."""
-    from fabric_aiops.connection import FabricApiError
+    """Exceptions translated to a one-line teaching error instead of a traceback.
 
-    return (FabricApiError, KeyError, OSError, ValueError)
+    ``PolicyDenied`` is kept in the catch list defensively: the harness no longer
+    raises it, but should any legacy path ever surface one, catching it here
+    turns it into a readable one-liner rather than a bare traceback. The
+    connection / value errors are the ones that actually reach here, each
+    carrying teaching text about what to fix.
+    """
+    from fabric_aiops.connection import FabricApiError
+    from fabric_aiops.governance import PolicyDenied
+
+    return (FabricApiError, KeyError, OSError, ValueError, PolicyDenied)
 
 
 def cli_errors(fn: Callable) -> Callable:
@@ -53,6 +61,24 @@ def cli_errors(fn: Callable) -> Callable:
             raise typer.Exit(1) from e
 
     return wrapper
+
+
+def governed(result: Any) -> dict:
+    """Return a governed tool's result, or print its error and exit 1.
+
+    The ``mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
+    failure — a refused bind, an unreachable Dashboard API — into
+    ``{"error": ...}``. Printing that dict makes the refusal visible to a
+    human but still exits 0, so a CI job or a shell ``&&`` chain reads a REFUSED
+    write as a completed one. The write itself is correctly blocked; it is the
+    exit code that lies, which is the harder failure to notice. Route every
+    governed call through here — reads included, so that no command in this CLI
+    reports its outcome differently from its neighbours.
+    """
+    if isinstance(result, dict) and result.get("error"):
+        console.print(f"[red]Error: {result['error']}[/]")
+        raise typer.Exit(1)
+    return result if isinstance(result, dict) else {}
 
 
 def get_connection(target: str | None, config_path: Path | None = None) -> tuple[Any, Any]:

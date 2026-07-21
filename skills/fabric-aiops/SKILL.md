@@ -22,7 +22,7 @@ compatibility: >
   Standalone, self-governed network-fabric controller operations. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry): meraki (Cisco Meraki Dashboard, reference platform, full read+write), catalyst (Cisco Catalyst Center, read subset — sites stand in for organizations/networks), cvp (Arista CloudVision Portal, read subset — containers stand in for organizations/networks), and unifi (UniFi Network controller / UniFi OS console, read subset — sites stand in for organizations/networks — plus the device-restart write via a cmd/devmgr command envelope). Unmapped ops raise a teaching "not supported on <platform> yet" error; all writes are Meraki-only except UniFi device restart.
   All write operations are audited to a local SQLite DB under ~/.fabric-aiops/ (relocatable via FABRIC_AIOPS_HOME).
   Credentials: the controller secret (Meraki API key / Catalyst Center username:password / CVP service-account token / UniFi API key) is stored ENCRYPTED in ~/.fabric-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'fabric-aiops init' to onboard, or 'fabric-aiops secret set <target>' to add one. The store is unlocked by a master password from FABRIC_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var FABRIC_<TARGET_NAME_UPPER>_APIKEY is still honoured as a fallback with a deprecation warning (migrate with 'fabric-aiops secret migrate'). Meraki/CVP/UniFi secrets ride the platform auth header (Authorization: Bearer, X-Cisco-Meraki-API-Key, or UniFi's X-API-KEY) at request time; the Catalyst Center secret is exchanged via POST /dna/system/api/v1/auth/token for a short-lived X-Auth-Token (auto-refreshed once on 401). UniFi legacy cookie login (POST /api/login) is not implemented — use an API key (UniFi OS console or self-hosted Network Server 9.0+; a UniFi OS console's base_url carries the /proxy/network prefix). Secrets are held only in memory and never logged or echoed.
-  State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate) and take a dry_run preview. Mutating/reversible writes fetch the real before-state first and record a faithful inverse undo descriptor; irreversible ops (reboot, blink) record only the before-state.
+  State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier label) and take a dry_run preview. Mutating/reversible writes fetch the real before-state first and record a faithful inverse undo descriptor; irreversible ops (reboot, blink) record only the before-state.
   Webhooks: none — no outbound network calls beyond the configured controller REST API base URL.
   SSL: verify_ssl defaults to true; disable only for a self-signed on-prem controller proxy.
   Transitive dependencies: httpx (HTTP client) and the MCP SDK. No post-install scripts or background services.
@@ -33,7 +33,7 @@ compatibility: >
 
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, Ubiquiti, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
 
-Governed network-fabric controller operations — **34 MCP tools** over **four platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed network-fabric controller operations — **34 MCP tools** over **four platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, token/runaway budget guard, undo-token recording, and descriptive risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
 > **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. The test suite is mock-based; no platform has yet been exercised against a live controller (see `docs/VERIFICATION.md`).
 
@@ -113,7 +113,7 @@ fabric-aiops doctor
 3. `fabric-aiops org device-statuses` → find the offline/alerting devices dragging the worst network's score
 4. `fabric-aiops device status <serial>` → confirm the device before changing it
 5. `fabric-aiops remediate update-device <serial> '{"name":"branch-ap-01"}' --dry-run` → preview the exact `PUT /devices/<serial>` call; then run without `--dry-run` (double confirmation). The real before-state is fetched first and recorded as a faithful inverse
-6. **Failure branch**: wrong attribute or wrong device — `fabric-aiops undo list`, then `fabric-aiops undo apply <id>` restores the captured prior attributes. If the write is refused outright, it is the secure-by-default gate: set `FABRIC_AUDIT_APPROVED_BY` and `FABRIC_AUDIT_RATIONALE`, or author a `~/.fabric-aiops/rules.yaml`.
+6. **Failure branch**: wrong attribute or wrong device — `fabric-aiops undo list`, then `fabric-aiops undo apply <id>` restores the captured prior attributes. Re-run `fabric-aiops device status <serial>` to confirm the restore landed rather than trusting the undo's success message.
 
 ### Bring a drifted network back to its config template (reversible)
 
@@ -140,11 +140,17 @@ fabric-aiops doctor
 
 ## Governance & Safety
 
-- Every tool is audited to `~/.fabric-aiops/audit.db` (relocatable via `FABRIC_AIOPS_HOME`).
-- High-risk ops can require a named approver: set `FABRIC_AUDIT_APPROVED_BY` and `FABRIC_AUDIT_RATIONALE` (the env-var names the bundled harness reads).
-- **Secure by default (v0.2.0+)**: with no `~/.fabric-aiops/rules.yaml`, high/critical operations are denied unless `FABRIC_AUDIT_APPROVED_BY` names an approver (set `FABRIC_AUDIT_RATIONALE` too). `fabric-aiops init` seeds a starter rules.yaml; an operator-authored rules file is honoured as-is.
-- Writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI.
-- Mutating/reversible writes fetch the real before-state and record an inverse descriptor; irreversible ops (reboot, blink) record only the before-state.
+The skill delivers reads and writes and records them; it does **not** decide
+whether a write is permitted. That is your agent's judgement, or the permission
+of the account you connect it with (a Meraki API key whose admin has read-only
+organization access — writes then fail at the controller). There is no read-only
+switch, policy file, or approval gate.
+
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.fabric-aiops/audit.db` (relocatable via `FABRIC_AIOPS_HOME`): params, result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- `FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
+- **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `FABRIC_RUNAWAY_MAX=0`.
+- Destructive writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI.
+- Mutating/reversible writes fetch the real before-state and record an inverse descriptor (`update_device`/`update_network_vlan`→restore prior values, `claim`↔`remove`, `bind`↔`unbind`/rebind); irreversible ops (`reboot_device`, `blink_device_leds`) record only the before-state.
 
 ## References
 

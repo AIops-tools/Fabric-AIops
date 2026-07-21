@@ -9,16 +9,32 @@ the tool now enforces them itself.
 The distinction matters. A guardrail in a prompt is a request. A guardrail in the
 harness is a guarantee. Anything below that we could move into the harness, we did.
 
-## What the tool now enforces — do not waste prompt budget on these
+## Authorization is not this tool's job — decide it where it belongs
+
+Whether a write should happen is your decision, or the account's. The tool does
+not gate it — there is no read-only switch and no approval prompt to configure.
+The two right places to control read vs write:
+
+- **The account you connect with.** Give it a Meraki API key whose admin has
+  read-only organization access (or the read-only equivalent on your
+  controller). A write then fails at the controller, which is the only place the
+  permission actually lives — no skill-side flag can be argued around by a model,
+  but a revoked permission cannot be.
+- **Your agent's system prompt.** If you want an observe-only session, tell the
+  model not to call the write tools (they are clearly tagged `[WRITE]`).
+
+What the tool *does* guarantee is that you can always see what happened:
+
+## What the tool enforces — do not waste prompt budget on these
 
 | You might be tempted to prompt | Why you don't need to |
 |---|---|
-| "Work read-only, never modify anything" | Set `FABRIC_READ_ONLY=1`. Write tools are then **not registered at all** — they never appear in the tool list, so the model cannot call one even if it tries. The `@governed_tool` harness independently refuses writes, so the CLI is covered too. |
+| "Log everything you do, over both MCP and the CLI" | Every call is audited to `~/.fabric-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. Reversible writes also record an undo token capturing the *prior* state. |
 | "Don't invent a value when a field is missing" | A field the controller did not return comes back as `null`, never as `""`. Absent and empty are distinguishable in the payload. |
 | "Tell me if the output was cut off" | Anything with a `limit` returns `{"devices": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is measured against the full result, not guessed from a length coincidence. |
 | "Preserve the ordering / tell me what's most urgent" | The ranked analyses return worst-first and carry the numbers that produced each ranking (`avgLossPct`, `score`, `alertPenalty`), so priority is in the payload rather than implied by list position. |
-| "Confirm before anything destructive" | Destructive operations require a `--dry-run`-able preview + double confirmation at the CLI, and a named approver (`FABRIC_AUDIT_APPROVED_BY`) for high-risk tiers. |
-| "Log what you did" | Every call is audited to `~/.fabric-aiops/audit.db` regardless of what the model says it did. |
+| "Confirm before anything destructive" | Destructive operations require a `--dry-run`-able preview + double confirmation at the CLI. |
+| "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
 | "Don't guess at an unsupported platform" | An operation a platform does not map raises a teaching `PlatformUnsupported` error naming the platform — never a silent no-op the model can mistake for success. |
 
 ## What still needs a prompt
@@ -74,23 +90,20 @@ SCOPE
 
 ## Recommended setup for a local model
 
+Start with a connection that *cannot* write, verify, and widen the account's
+permission only when you trust the setup — the fleet-affecting operations here
+(`reboot_device`, `remove_device_from_network`, `bind_network_to_template`) hit
+production hardware and live networks:
+
 ```bash
-# Read-only until you trust the setup — this is enforced, not advisory.
-export FABRIC_READ_ONLY=1
+# e.g. use a Meraki API key whose admin has read-only organization access. Then:
 fabric-aiops doctor
 ```
 
-With `FABRIC_READ_ONLY=1` set, the eight write tools (`reboot_device`,
-`blink_device_leds`, `update_device`, `update_network_vlan`,
-`claim_devices_into_network`, `remove_device_from_network`,
-`bind_network_to_template`, `unbind_network_from_template`) plus `undo_apply`
-are not registered, leaving only the reads and the three analyses.
-
-Then, when you are ready to allow writes, unset it and set an approver so the
-high-risk tier has an accountable name on it:
+Optionally annotate the audit trail with who is operating and why — recorded on
+every row, never required:
 
 ```bash
-unset FABRIC_READ_ONLY
 export FABRIC_AUDIT_APPROVED_BY="your.name@example.com"
 export FABRIC_AUDIT_RATIONALE="scheduled maintenance window 2026-07-20"
 ```

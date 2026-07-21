@@ -1,7 +1,7 @@
 """Meraki remediation MCP tools (guarded writes).
 
 The only state-changing tools in the package. Every one is wrapped with the
-governance harness (audit + graduated approval tier) and takes a ``dry_run``
+governance harness (audit + risk tier) and takes a ``dry_run``
 preview. Reversible writes pass an ``undo=`` callback that turns the fetched
 before-state into an inverse descriptor the harness records; irreversible ones
 (reboot, blink) record none. An undo builder that cannot verify what it would
@@ -147,6 +147,7 @@ def reboot_device(serial: str, dry_run: bool = False, target: Optional[str] = No
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.require_write_support(conn, "reboot_device")
     if dry_run:
         return {"dryRun": True, "wouldReboot": {"serial": serial}}
     return ops.reboot_device(conn, serial)
@@ -162,9 +163,8 @@ def blink_device_leds(
 
     No configuration change (a locate aid), so no undo is recorded. It is still
     a POST to the controller, so it is tiered as a write: ``risk_level="low"``
-    is what marks a tool as a *read*, and read-only mode keys off exactly that.
-    Tiering this "low" would have left it callable — and exposed — with
-    FABRIC_READ_ONLY set, contradicting its own [WRITE] tag.
+    is what marks a tool as a *read*. Tiering this "low" would misreport a POST
+    as a read in the audit trail, contradicting its own [WRITE] tag.
 
     Args:
         serial: Device serial.
@@ -197,6 +197,7 @@ def update_device(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.require_write_support(conn, "update_device")
     if dry_run:
         return {"dryRun": True, "wouldUpdate": {"serial": serial, "attrs": attrs}}
     return ops.update_device(conn, serial, attrs)
@@ -226,6 +227,7 @@ def update_network_vlan(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.require_write_support(conn, "update_network_vlan")
     if dry_run:
         return {"dryRun": True, "wouldUpdate": {"vlanId": vlan_id, "attrs": attrs}}
     return ops.update_network_vlan(conn, network_id, vlan_id, attrs)
@@ -252,6 +254,7 @@ def claim_devices_into_network(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.require_write_support(conn, "claim_devices_into_network")
     if dry_run:
         return {"dryRun": True, "wouldClaim": {"networkId": network_id, "serials": serials}}
     return ops.claim_devices_into_network(conn, network_id, serials)
@@ -292,6 +295,7 @@ def remove_device_from_network(
     if not batch:
         raise ValueError("remove_device_from_network requires serial or serials.")
     conn = _get_connection(target)
+    ops.require_write_support(conn, "remove_device_from_network")
     if dry_run:
         return {"dryRun": True, "wouldRemove": {"networkId": network_id, "serials": batch}}
     if len(batch) == 1:
@@ -369,6 +373,7 @@ def unbind_network_from_template(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.require_write_support(conn, "unbind_network_from_template")
     if dry_run:
         return {"dryRun": True, "wouldUnbind": {"networkId": network_id}}
     return ops.unbind_network_from_template(conn, network_id)

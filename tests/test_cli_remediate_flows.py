@@ -1,7 +1,8 @@
 """``fabric-aiops remediate`` write flows: the dry-run preview branch of every
-command (prints the API call, makes no call, writes no audit) and the confirmed
-path (past double-confirm, through the governed twin, onto the audit log) for
-every write except update-device (already covered in test_cli_writes)."""
+command (routed through the governed twin — reads and audits, never mutates)
+and the confirmed path (past double-confirm, through the governed twin, onto
+the audit log) for every write except update-device (already covered in
+test_cli_writes)."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import fabric_aiops.governance.policy as policy_mod
 import fabric_aiops.governance.undo as undo_mod
 from fabric_aiops.cli import app
 from fabric_aiops.config import TargetConfig
+from fabric_aiops.platform import CATALYST, UNIFI
 
 runner = CliRunner()
 
@@ -59,17 +61,28 @@ def _mock_conn() -> MagicMock:
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "args",
+    ("args", "tool"),
     [
-        ["remediate", "reboot", "Q2", "--dry-run"],
-        ["remediate", "update-vlan", "N1", "10", '{"name":"data"}', "--dry-run"],
-        ["remediate", "claim", "N1", "Q2", "Q3", "--dry-run"],
-        ["remediate", "remove", "N1", "Q2", "--dry-run"],
-        ["remediate", "bind", "N1", "T1", "--dry-run"],
-        ["remediate", "unbind", "N1", "--dry-run"],
+        (["remediate", "reboot", "Q2", "--dry-run"], "reboot_device"),
+        (
+            ["remediate", "update-vlan", "N1", "10", '{"name":"data"}', "--dry-run"],
+            "update_network_vlan",
+        ),
+        (["remediate", "claim", "N1", "Q2", "Q3", "--dry-run"], "claim_devices_into_network"),
+        (["remediate", "remove", "N1", "Q2", "--dry-run"], "remove_device_from_network"),
+        (["remediate", "bind", "N1", "T1", "--dry-run"], "bind_network_to_template"),
+        (["remediate", "unbind", "N1", "--dry-run"], "unbind_network_from_template"),
     ],
 )
-def test_dry_run_prints_preview_and_writes_no_audit(gov_home, monkeypatch, args):
+def test_dry_run_reads_and_audits_but_never_writes(gov_home, monkeypatch, args, tool):
+    """The invariant every remediate preview holds: a dry-run MAY read; it must never write.
+
+    Each preview now runs the governed twin with ``dry_run=True``, so it reads
+    whatever the guards need (bind reads the network's VLANs; all of them resolve
+    the target's platform) and lands the same audit row a governed call always
+    lands — the MCP preview always did, and the CLI silently skipping it was the
+    outlier. The one thing it may never do is issue the mutating POST/PUT.
+    """
     conn = _mock_conn()
     import mcp_server.tools.remediation as govmod
 
@@ -79,7 +92,64 @@ def test_dry_run_prints_preview_and_writes_no_audit(gov_home, monkeypatch, args)
     assert "DRY-RUN" in result.output
     conn.post.assert_not_called()
     conn.put.assert_not_called()
-    assert not (gov_home / "audit.db").exists()
+    assert _audit_tools(gov_home / "audit.db") == [tool]
+
+
+# ── a preview whose answer is "refused" must refuse ─────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["remediate", "reboot", "Q2", "--dry-run"],
+        ["remediate", "update-device", "Q2", '{"name":"ap1"}', "--dry-run"],
+        ["remediate", "update-vlan", "N1", "10", '{"name":"data"}', "--dry-run"],
+        ["remediate", "claim", "N1", "Q2", "--dry-run"],
+        ["remediate", "remove", "N1", "Q2", "--dry-run"],
+        ["remediate", "bind", "N1", "T1", "--dry-run"],
+        ["remediate", "unbind", "N1", "--dry-run"],
+    ],
+)
+def test_cli_dry_run_on_an_unsupported_platform_refuses_nonzero(gov_home, monkeypatch, args):
+    """Catalyst Center maps none of these writes, so every preview is a refusal.
+
+    The banner must not appear and the exit code must be non-zero. A green
+    preview followed by "not supported on this platform" reads to a weak model
+    as a transient failure worth retrying — and to a shell ``&&`` chain as a
+    completed step.
+    """
+    conn = _mock_conn()
+    conn.target = TargetConfig(name="t", platform=CATALYST)
+    import mcp_server.tools.remediation as govmod
+
+    monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
+    result = runner.invoke(app, args)
+    assert result.exit_code == 1, result.output
+    assert "DRY-RUN" not in result.output
+    assert "not supported on Cisco Catalyst Center API" in result.output
+    conn.post.assert_not_called()
+    conn.put.assert_not_called()
+
+
+@pytest.mark.unit
+def test_cli_dry_run_still_previews_on_a_platform_that_maps_the_write(gov_home, monkeypatch):
+    """Exactness: UniFi maps device restart, so its preview is green, not refused.
+
+    Guards the refusal above against over-reach — a preview that refuses
+    everything off the reference platform would be just as wrong as one that
+    refuses nothing.
+    """
+    conn = _mock_conn()
+    conn.target = TargetConfig(name="t", platform=UNIFI)
+    import mcp_server.tools.remediation as govmod
+
+    monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
+    result = runner.invoke(app, ["remediate", "reboot", "Q2", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "DRY-RUN" in result.output
+    conn.post.assert_not_called()
+    assert _audit_tools(gov_home / "audit.db") == ["reboot_device"]
 
 
 # ── confirmed writes go through the governed twin (audit row lands) ──────────

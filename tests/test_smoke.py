@@ -43,8 +43,8 @@ HIGH_RISK = {
     "bind_network_to_template", "unbind_network_from_template",
 }
 # blink_device_leds is non-destructive but still a controller POST, so it is
-# tiered as a write: risk_level "low" is what marks a tool as a *read*, and
-# read-only mode keys off exactly that. There is no "low-risk write" tier.
+# tiered as a write (non-low risk_level): risk_level "low" is what marks a tool
+# as a *read*. There is no "low-risk write" tier.
 MEDIUM_RISK = {"update_device", "update_network_vlan", "blink_device_leds"}
 
 
@@ -248,14 +248,25 @@ def test_bind_undo_rebinds_to_prior_template(monkeypatch):
 
 
 @pytest.mark.unit
-def test_dry_run_gates_destructive_cli():
-    """remediate reboot --dry-run must not touch the connection."""
+def test_dry_run_gates_destructive_cli(monkeypatch):
+    """remediate reboot --dry-run previews without issuing the reboot.
+
+    It goes through the governed twin, so it needs a connection — resolving the
+    target's platform is how the preview learns whether the write is even
+    available there. What it must never do is POST.
+    """
     from fabric_aiops.cli import app
+    from mcp_server.tools import remediation as rem
+
+    conn = MagicMock(name="conn")
+    monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
 
     runner = CliRunner()
     result = runner.invoke(app, ["remediate", "reboot", "Q2XX-XXXX-XXXX", "--dry-run"])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "DRY-RUN" in result.output
+    conn.post.assert_not_called()
+    conn.put.assert_not_called()
 
 
 @pytest.mark.unit
@@ -270,3 +281,33 @@ def test_mcp_write_dry_run_does_not_execute():
         out = rem.reboot_device(serial="Q2", dry_run=True)
     assert out.get("dryRun") is True
     conn.post.assert_not_called()
+
+
+@pytest.mark.unit
+def test_risk_level_agrees_with_read_write_docstring_tag():
+    """The two write-markers must never drift apart.
+
+    A tool's ``risk_level`` decides its audit tier and whether it gets dry-run /
+    undo handling; its ``[READ]``/``[WRITE]`` docstring tag is what the docs and
+    capability tables are built from. If a ``[WRITE]`` were left ``risk_level=low``
+    it would be audited as a read and skip the write machinery — this test caught
+    16 such mislabels line-wide once, so it is kept even though read-only mode
+    (its original motivation) is gone.
+    """
+    from mcp_server import server
+
+    untagged, mismatched = [], []
+    for name, tool in server.mcp._tool_manager._tools.items():
+        doc = (tool.fn.__doc__ or "").lstrip()
+        if doc.startswith("[READ]"):
+            tagged_as_read = True
+        elif doc.startswith("[WRITE]"):
+            tagged_as_read = False
+        else:
+            untagged.append(name)
+            continue
+        if tagged_as_read != (getattr(tool.fn, "_risk_level", "low") == "low"):
+            mismatched.append(name)
+
+    assert not untagged, f"tools missing a [READ]/[WRITE] docstring tag: {untagged}"
+    assert not mismatched, f"risk_level disagrees with the docstring tag: {mismatched}"

@@ -48,7 +48,15 @@ def _mock_conn() -> MagicMock:
 
 
 @pytest.mark.unit
-def test_cli_update_device_dry_run_makes_no_call_and_no_audit(gov_home, monkeypatch):
+def test_cli_update_device_dry_run_reads_and_audits_but_never_writes(gov_home, monkeypatch):
+    """A dry-run MAY read; it must never write — and it is audited like any call.
+
+    The old name asserted the abandoned rule ("makes no call and no audit"). It
+    was never the rule the MCP path followed: ``@governed_tool`` wraps the
+    function whether or not ``dry_run`` is set, so an MCP preview has always
+    written its audit row. Skipping it on the CLI made the audit trail depend on
+    which door the operator came through.
+    """
     from fabric_aiops.cli import app
 
     conn = _mock_conn()
@@ -58,11 +66,11 @@ def test_cli_update_device_dry_run_makes_no_call_and_no_audit(gov_home, monkeypa
     result = CliRunner().invoke(
         app, ["remediate", "update-device", "Q2AB-CDEF-GHIJ", '{"name": "ap1"}', "--dry-run"]
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "DRY-RUN" in result.output
-    conn.get.assert_not_called()
-    conn.put.assert_not_called()
-    assert not (gov_home / "audit.db").exists()
+    conn.put.assert_not_called(), "the one thing a dry-run may never do"
+    conn.post.assert_not_called()
+    assert _audit_tools(gov_home / "audit.db") == ["update_device"]
 
 
 @pytest.mark.unit

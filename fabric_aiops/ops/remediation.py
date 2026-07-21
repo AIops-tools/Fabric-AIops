@@ -36,10 +36,36 @@ from fabric_aiops.ops._util import (
     require_support,
 )
 
+# Canonical ops each write needs the target's platform to map. Declared once,
+# here, so the *preview* can run the same support check as the real call without
+# restating the key list at the MCP layer — a second copy would drift, and the
+# failure mode of drift is a preview that says a write is available on a
+# platform that will refuse it.
+WRITE_SUPPORT: dict[str, tuple[str, ...]] = {
+    "reboot_device": ("devices.reboot",),
+    "blink_device_leds": ("devices.blink_leds",),
+    "update_device": ("devices.update", "devices.get"),
+    "update_network_vlan": ("networks.vlan_update", "networks.vlan_get"),
+    "claim_devices_into_network": ("networks.claim_devices",),
+    "remove_device_from_network": ("networks.remove_device",),
+    "bind_network_to_template": ("networks.bind_template", "networks.get"),
+    "unbind_network_from_template": ("networks.unbind_template", "networks.get"),
+}
+
+
+def require_write_support(conn: Any, action: str) -> None:
+    """Fail fast with ``PlatformUnsupported`` when the target cannot do ``action``.
+
+    A local descriptor lookup — no controller call — so it is safe to run on the
+    dry-run path, which is the point: "this platform does not map that write" is
+    the answer the preview exists to give.
+    """
+    require_support(conn, *WRITE_SUPPORT[action])
+
 
 def reboot_device(conn: Any, serial: str) -> dict:
     """[WRITE] Reboot a device, capturing its prior status. No safe inverse."""
-    require_support(conn, "devices.reboot")
+    require_write_support(conn, "reboot_device")
     prior = _device_status_safe(conn, serial)
     op_post(conn, "devices.reboot", serial=serial)
     return {
@@ -51,7 +77,7 @@ def reboot_device(conn: Any, serial: str) -> dict:
 
 def blink_device_leds(conn: Any, serial: str, duration: int = 20) -> dict:
     """[WRITE] Blink a device's locator LEDs (physical-locate aid). No state change."""
-    require_support(conn, "devices.blink_leds")
+    require_write_support(conn, "blink_device_leds")
     duration = max(5, min(int(duration), 120))
     op_post(conn, "devices.blink_leds", json_body={"duration": duration}, serial=serial)
     return {"action": "blink_device_leds", "serial": serial, "durationSeconds": duration}
@@ -63,7 +89,7 @@ def update_device(conn: Any, serial: str, attrs: dict) -> dict:
     Reads the device first so the response carries ``priorState`` for the exact
     keys being changed (drives undo + audit); then PUTs the update.
     """
-    require_support(conn, "devices.update", "devices.get")
+    require_write_support(conn, "update_device")
     allowed = {"name", "tags", "address", "notes", "lat", "lng", "floorPlanId"}
     payload = {k: v for k, v in (attrs or {}).items() if k in allowed}
     prior_full = clean(op_get(conn, "devices.get", serial=serial))
@@ -79,7 +105,7 @@ def update_device(conn: Any, serial: str, attrs: dict) -> dict:
 
 def update_network_vlan(conn: Any, network_id: str, vlan_id: str, attrs: dict) -> dict:
     """[WRITE] Update an appliance VLAN, capturing the changed keys' prior values."""
-    require_support(conn, "networks.vlan_update", "networks.vlan_get")
+    require_write_support(conn, "update_network_vlan")
     allowed = {"name", "subnet", "applianceIp", "groupPolicyId", "dhcpHandling"}
     payload = {k: v for k, v in (attrs or {}).items() if k in allowed}
     prior_full = clean(
@@ -107,7 +133,7 @@ def claim_devices_into_network(conn: Any, network_id: str, serials: list[str]) -
 
     Records the claimed serials so the harness can offer an undo (remove them).
     """
-    require_support(conn, "networks.claim_devices")
+    require_write_support(conn, "claim_devices_into_network")
     serial_list = [str(s) for s in (serials or []) if s]
     op_post(
         conn,
@@ -134,7 +160,7 @@ def remove_device_from_network(conn: Any, network_id: str, serial: str) -> dict:
     settings). Capture those with ``device_status`` / ``switch_ports`` first if
     you will need them.
     """
-    require_support(conn, "networks.remove_device")
+    require_write_support(conn, "remove_device_from_network")
     op_post(
         conn,
         "networks.remove_device",
@@ -211,7 +237,7 @@ def guard_bind_network_to_template(conn: Any, network_id: str) -> dict:
         no appliance) — allowed, but recorded as unverified, and
         ``bind_network_to_template`` then offers no undo descriptor at all.
     """
-    require_support(conn, "networks.bind_template", "networks.get")
+    require_write_support(conn, "bind_network_to_template")
     prior = clean(op_get(conn, "networks.get", network_id=network_id))
     prior_template = prior.get("configTemplateId") if isinstance(prior, dict) else None
     if prior_template:
@@ -316,7 +342,7 @@ def unbind_network_from_template(conn: Any, network_id: str) -> dict:
 
     Reads the network first so undo can rebind to the template it was bound to.
     """
-    require_support(conn, "networks.unbind_template", "networks.get")
+    require_write_support(conn, "unbind_network_from_template")
     prior = clean(op_get(conn, "networks.get", network_id=network_id))
     prior_template = prior.get("configTemplateId")
     op_post(conn, "networks.unbind_template", network_id=network_id)

@@ -264,16 +264,18 @@ def test_cli_dry_run_fires_the_refusal(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_cli_confirmed_bind_fires_the_refusal(gov_home, monkeypatch):
-    """Past both confirmations, the refusal still stops the write.
+    """Past both confirmations, the refusal still stops the write — and exits 1.
 
     The confirmed CLI path runs through the governed twin, whose ``tool_errors``
-    wrapper renders any refusal as an error envelope rather than a traceback —
-    so the assertion is on the envelope and on nothing having been posted, not
-    on the exit code (that rendering is repo-wide, and predates this guard).
+    wrapper renders any refusal as an error envelope rather than a traceback.
+    The CLI now routes that envelope through ``governed()``, so the exit code
+    agrees with the outcome; it used to be 0, which told a CI caller checking
+    ``$?`` that a refused bind had succeeded.
     """
     conn = _Conn(vlans=_LOCAL_VLANS)
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "bind", "N1", "T1"], input="y\ny\n")
+    assert result.exit_code == 1, result.output
     assert "Refusing to bind network 'N1'" in result.output
     assert conn.posted() == []
 
