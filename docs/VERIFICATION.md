@@ -182,3 +182,36 @@ separately.
   429 handling trips first.
 - Record the result in the product line's verification ledger once green so the
   "verification debt" list stays accurate.
+
+## UniFi platform — probed against a real standalone controller (2026-08-01)
+
+A real **UniFi Network Application 10.4.57** (standalone, Docker + MongoDB) was
+stood up to settle a standing code-review suspicion about this platform's auth.
+What was established as fact:
+
+1. **The tool's paths are correct.** `GET /api/self/sites` and
+   `GET /api/s/default/stat/device` both return **200** on the real controller
+   (verified with cookie auth). So the classic endpoint templates in
+   `platforms/unifi.py` are real, not invented.
+2. **`/proxy/network/integrations/v1/...` returns 404** on a standalone
+   controller. That is the Integration API surface where UniFi introduced
+   `X-API-KEY`; it is a UniFi OS console feature and does not exist here.
+3. **An API key cannot be provisioned headlessly.** Key creation is UI-gated
+   (Settings → Control Plane → Integrations); no REST shape for minting one
+   could be found (`/api/self/apikey`, `/api/s/<site>/rest/apikey` → 400
+   `api.err.InvalidObject`).
+4. `x-api-key` appears in the controller's **frontend JS bundles** only, not in
+   any plain-text server resource — suggestive, but NOT conclusive, since the
+   Java server libraries are JARs.
+
+**Bounded conclusion.** `fabric-aiops` authenticates UniFi with `X-API-KEY` only
+and deliberately does not implement the cookie login. On a **standalone**
+Network Application there is therefore no headless way to provision the only
+credential it accepts, and the API surface that credential belongs to is absent.
+Practically, the UniFi platform is **not usable against a standalone controller
+without the UI**.
+
+**Still formally unproven:** whether the classic `/api/...` endpoints would
+accept a valid `X-API-KEY` if one were minted through the UI. That needs a real
+UniFi OS console (UDM/Cloud Key) or a UI-generated key. Do not "fix" the auth on
+the strength of this alone — verify first.
