@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "fabric-aiops": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "fabric-aiops==0.10.0",
+        "fabric-aiops-mcp"
+      ]
+    }
+  }
+}
