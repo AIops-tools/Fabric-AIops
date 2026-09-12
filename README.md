@@ -162,7 +162,7 @@ The same bundle is published on [ClawHub](https://clawhub.ai/plugins), where one
 install delivers the skill and its MCP server together:
 
 ```bash
-openclaw plugins install clawhub:@aiops-tools/fabric-aiops
+openclaw plugins install clawhub:@zw008/fabric-aiops
 openclaw skills info fabric-aiops          # expect: Visible to model: yes
 ```
 

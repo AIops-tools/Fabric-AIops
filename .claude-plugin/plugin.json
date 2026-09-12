@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "fabric-aiops",
   "displayName": "Fabric AIops",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo.",
   "author": {
     "name": "Wei Zhou",
