@@ -17,7 +17,7 @@ installer:
 argument-hint: "[org/network/device id or describe your fabric task]"
 allowed-tools:
   - Bash
-metadata: {"openclaw":{"requires":{"env":["FABRIC_AIOPS_CONFIG"],"bins":["fabric-aiops"],"config":["~/.fabric-aiops/config.yaml","~/.fabric-aiops/secrets.enc"]},"optional":{"env":["FABRIC_AIOPS_MASTER_PASSWORD"]},"primaryEnv":"FABRIC_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/Fabric-AIops","emoji":"🛰️","os":["macos","linux"]}}
+metadata: {"openclaw":{"requires":{"anyBins":["fabric-aiops","uvx"]},"optional":{"env":["FABRIC_AIOPS_CONFIG","FABRIC_AIOPS_MASTER_PASSWORD"]},"homepage":"https://github.com/AIops-tools/Fabric-AIops","emoji":"🛰️","os":["macos","linux"]}}
 compatibility: >
   Standalone, self-governed network-fabric controller operations. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Multi-platform by construction (a platform registry): meraki (Cisco Meraki Dashboard, reference platform, full read+write), catalyst (Cisco Catalyst Center, read subset — sites stand in for organizations/networks), cvp (Arista CloudVision Portal, read subset — containers stand in for organizations/networks), and unifi (UniFi Network controller / UniFi OS console, read subset — sites stand in for organizations/networks — plus the device-restart write via a cmd/devmgr command envelope). Unmapped ops raise a teaching "not supported on <platform> yet" error; all writes are Meraki-only except UniFi device restart.
   All write operations are audited to a local SQLite DB under ~/.fabric-aiops/ (relocatable via FABRIC_AIOPS_HOME).

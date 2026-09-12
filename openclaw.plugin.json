@@ -1,0 +1,24 @@
+{
+  "id": "fabric-aiops",
+  "name": "Fabric AIops",
+  "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "fabric-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "fabric-aiops==0.11.0",
+        "fabric-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
