@@ -74,6 +74,13 @@ fabric-aiops init       # interactive wizard: platform choice (meraki/catalyst/c
 fabric-aiops doctor
 ```
 
+Or as an OpenClaw plugin, which installs this skill and its MCP server together:
+
+```bash
+openclaw plugins install clawhub:@aiops-tools/fabric-aiops
+openclaw skills info fabric-aiops          # expect: Visible to model: yes
+```
+
 ## When to Use This Skill
 
 - Triage an organization (`overview`): network count + device status/product rollup
