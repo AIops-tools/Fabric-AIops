@@ -81,6 +81,8 @@ openclaw plugins install clawhub:@aiops-tools/fabric-aiops
 openclaw skills info fabric-aiops          # expect: Visible to model: yes
 ```
 
+Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release.
+
 ## When to Use This Skill
 
 - Triage an organization (`overview`): network count + device status/product rollup
