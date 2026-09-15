@@ -11,6 +11,7 @@ from fabric_aiops.cli._common import (
     LimitOption,
     OrgOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     get_connection,
@@ -29,6 +30,7 @@ NetIdArg = Annotated[str, typer.Argument(help="Network id (from 'network list')"
 
 @network_app.command("list")
 @cli_errors
+@audited
 def network_list(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """List networks in the organization."""
     from fabric_aiops.ops import networks as ops
@@ -39,6 +41,7 @@ def network_list(org_id: OrgOption = None, target: TargetOption = None) -> None:
 
 @network_app.command("get")
 @cli_errors
+@audited
 def network_get(network_id: NetIdArg, target: TargetOption = None) -> None:
     """Show one network by id."""
     from fabric_aiops.ops import networks as ops
@@ -49,6 +52,7 @@ def network_get(network_id: NetIdArg, target: TargetOption = None) -> None:
 
 @network_app.command("vlans")
 @cli_errors
+@audited
 def network_vlans(network_id: NetIdArg, target: TargetOption = None) -> None:
     """List appliance VLANs configured on a network."""
     from fabric_aiops.ops import networks as ops
@@ -59,6 +63,7 @@ def network_vlans(network_id: NetIdArg, target: TargetOption = None) -> None:
 
 @network_app.command("alerts")
 @cli_errors
+@audited
 def network_alerts(
     network_id: NetIdArg, limit: LimitOption = None, target: TargetOption = None
 ) -> None:
@@ -71,6 +76,7 @@ def network_alerts(
 
 @network_app.command("traffic")
 @cli_errors
+@audited
 def network_traffic(
     network_id: NetIdArg,
     timespan: Annotated[int, typer.Option(help="Look-back seconds (7200..2592000)")] = 86400,

@@ -10,6 +10,7 @@ from fabric_aiops.cli._common import (
     LimitOption,
     OrgOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     get_connection,
@@ -26,6 +27,7 @@ org_app = typer.Typer(
 
 @org_app.command("list")
 @cli_errors
+@audited
 def org_list(target: TargetOption = None) -> None:
     """List organizations visible to the API key."""
     from fabric_aiops.ops import organizations as ops
@@ -36,6 +38,7 @@ def org_list(target: TargetOption = None) -> None:
 
 @org_app.command("get")
 @cli_errors
+@audited
 def org_get(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """Show one organization by id."""
     from fabric_aiops.ops import organizations as ops
@@ -46,6 +49,7 @@ def org_get(org_id: OrgOption = None, target: TargetOption = None) -> None:
 
 @org_app.command("licensing")
 @cli_errors
+@audited
 def org_licensing(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """Org licensing overview."""
     from fabric_aiops.ops import organizations as ops
@@ -56,6 +60,7 @@ def org_licensing(org_id: OrgOption = None, target: TargetOption = None) -> None
 
 @org_app.command("admins")
 @cli_errors
+@audited
 def org_admins(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """List dashboard administrators for the org."""
     from fabric_aiops.ops import organizations as ops
@@ -66,6 +71,7 @@ def org_admins(org_id: OrgOption = None, target: TargetOption = None) -> None:
 
 @org_app.command("device-statuses")
 @cli_errors
+@audited
 def org_device_statuses(
     org_id: OrgOption = None, limit: LimitOption = None, target: TargetOption = None
 ) -> None:
@@ -78,6 +84,7 @@ def org_device_statuses(
 
 @org_app.command("api-usage")
 @cli_errors
+@audited
 def org_api_usage(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """Org API-request usage overview (response-code counts, 429 rate-limits)."""
     from fabric_aiops.ops import organizations as ops

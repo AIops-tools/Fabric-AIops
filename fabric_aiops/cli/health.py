@@ -10,6 +10,7 @@ from fabric_aiops.cli._common import (
     LimitOption,
     OrgOption,
     TargetOption,
+    audited,
     cli_errors,
     get_connection,
     limit_kwargs,
@@ -25,6 +26,7 @@ health_app = typer.Typer(
 
 @health_app.command("uplink-rca")
 @cli_errors
+@audited
 def health_uplink_rca(
     loss_pct: Annotated[float, typer.Option(help="Avg loss %% = degraded")] = 5.0,
     latency_ms: Annotated[float, typer.Option(help="Avg latency ms = degraded")] = 150.0,
@@ -46,6 +48,7 @@ def health_uplink_rca(
 
 @health_app.command("score")
 @cli_errors
+@audited
 def health_score(
     org_id: OrgOption = None, limit: LimitOption = None, target: TargetOption = None
 ) -> None:

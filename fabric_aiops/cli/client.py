@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from fabric_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from fabric_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 client_app = typer.Typer(
     name="client",
@@ -21,6 +21,7 @@ ClientIdArg = Annotated[str, typer.Argument(help="Client id/MAC (from 'client li
 
 @client_app.command("list")
 @cli_errors
+@audited
 def client_list(
     network_id: NetIdArg,
     timespan: Annotated[int, typer.Option(help="Look-back seconds (7200..2592000)")] = 86400,
@@ -35,6 +36,7 @@ def client_list(
 
 @client_app.command("get")
 @cli_errors
+@audited
 def client_get(network_id: NetIdArg, client_id: ClientIdArg, target: TargetOption = None) -> None:
     """Show one client's detail."""
     from fabric_aiops.ops import clients as ops
@@ -45,6 +47,7 @@ def client_get(network_id: NetIdArg, client_id: ClientIdArg, target: TargetOptio
 
 @client_app.command("usage")
 @cli_errors
+@audited
 def client_usage(network_id: NetIdArg, client_id: ClientIdArg, target: TargetOption = None) -> None:
     """A client's usage history rolled up to total sent/received KB."""
     from fabric_aiops.ops import clients as ops
@@ -55,6 +58,7 @@ def client_usage(network_id: NetIdArg, client_id: ClientIdArg, target: TargetOpt
 
 @client_app.command("connectivity")
 @cli_errors
+@audited
 def client_connectivity(
     network_id: NetIdArg, client_id: ClientIdArg, target: TargetOption = None
 ) -> None:

@@ -11,6 +11,7 @@ from fabric_aiops.cli._common import (
     LimitOption,
     OrgOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     get_connection,
@@ -29,6 +30,7 @@ SerialArg = Annotated[str, typer.Argument(help="Device serial (from 'device inve
 
 @device_app.command("inventory")
 @cli_errors
+@audited
 def device_inventory(
     org_id: OrgOption = None,
     model: Annotated[str | None, typer.Option("--model", help="Model family/prefix")] = None,
@@ -44,6 +46,7 @@ def device_inventory(
 
 @device_app.command("status")
 @cli_errors
+@audited
 def device_status(serial: SerialArg, org_id: OrgOption = None, target: TargetOption = None) -> None:
     """Show one device's availability status."""
     from fabric_aiops.ops import devices as ops
@@ -54,6 +57,7 @@ def device_status(serial: SerialArg, org_id: OrgOption = None, target: TargetOpt
 
 @device_app.command("uplinks")
 @cli_errors
+@audited
 def device_uplinks(org_id: OrgOption = None, target: TargetOption = None) -> None:
     """Appliance/gateway uplink statuses across the org."""
     from fabric_aiops.ops import devices as ops
@@ -64,6 +68,7 @@ def device_uplinks(org_id: OrgOption = None, target: TargetOption = None) -> Non
 
 @device_app.command("switch-ports")
 @cli_errors
+@audited
 def device_switch_ports(serial: SerialArg, target: TargetOption = None) -> None:
     """Switch (MS) port configuration for a device."""
     from fabric_aiops.ops import devices as ops
@@ -74,6 +79,7 @@ def device_switch_ports(serial: SerialArg, target: TargetOption = None) -> None:
 
 @device_app.command("ssids")
 @cli_errors
+@audited
 def device_ssids(
     network_id: Annotated[str, typer.Argument(help="Network id the APs belong to")],
     target: TargetOption = None,
