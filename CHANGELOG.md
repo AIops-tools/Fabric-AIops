@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The truncation row asserted a literal `devices` key for every bounded read; the envelope
+  key names what was listed (`alerts`, `topApplications`, `worst`, `driftedNetworks`,
+  `undos`), so a model looking for `devices` in `network_alerts` would find none and could
+  report the network has no alerts.
+
 ## v0.11.4 — 2026-09-16
 
 ### Fixed
