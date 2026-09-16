@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.11.5 — 2026-09-17
 
 ### Fixed
 - The truncation row asserted a literal `devices` key for every bounded read; the envelope
