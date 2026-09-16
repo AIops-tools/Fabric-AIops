@@ -303,3 +303,34 @@ def test_atexit_hook_closes_cached_clients_and_never_raises():
     bad.close.side_effect = RuntimeError("boom")
     mgr._connections["org1"] = bad
     conn_mod._close_all_managers()  # must not raise
+
+
+@pytest.mark.unit
+def test_a_manager_the_cli_dropped_is_still_closed_at_exit():
+    """cli/_common.get_connection builds a manager, returns only the connection and
+    drops the manager. A weak registry collects it, and the atexit hook then finds
+    nothing to close — silently, because the hook cannot tell "no managers" from
+    "no managers left". Pinned here so a teardown that ever does more than shut a
+    local socket still gets reached from the CLI path."""
+    import gc
+
+    import fabric_aiops.connection as conn_mod
+    from fabric_aiops.config import AppConfig
+
+    closed = {"n": 0}
+
+    class _Conn:
+        def close(self):
+            closed["n"] += 1
+
+    def like_get_connection():
+        mgr = conn_mod.ConnectionManager(AppConfig(targets=[]))
+        conn = _Conn()
+        mgr._connections["org1"] = conn
+        return conn  # the manager goes out of scope here, exactly as the CLI drops it
+
+    conn = like_get_connection()
+    gc.collect()
+    conn_mod._close_all_managers()
+    assert closed["n"] == 1, "a manager the CLI dropped was never closed at exit"
+    assert conn is not None
