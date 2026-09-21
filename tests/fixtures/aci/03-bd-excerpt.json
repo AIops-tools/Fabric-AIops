@@ -1,0 +1,75 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "fvBD": {
+        "attributes": {
+          "dn": "uni/tn-tenant-A/BD-bd-A",
+          "name": "bd-A",
+          "descr": "192.0.2.0/22",
+          "mac": "02:00:00:00:00:02",
+          "scope": "500001",
+          "seg": "500002",
+          "unicastRoute": "yes",
+          "ipLearning": "yes",
+          "limitIpLearnToSubnets": "yes"
+        },
+        "children": [
+          {
+            "fvRsCtx": {
+              "attributes": {
+                "annotation": "",
+                "childAction": "",
+                "extMngdBy": "",
+                "forceResolve": "yes",
+                "lcOwn": "local",
+                "modTs": "2021-06-24T02:27:45.803-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "rType": "mo",
+                "rn": "rsctx",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fvCtx",
+                "tContextDn": "",
+                "tDn": "uni/tn-common/ctx-vrf-A",
+                "tRn": "ctx-vrf-A",
+                "tType": "name",
+                "tnFvCtxName": "vrf-A",
+                "uid": "0",
+                "userdom": "all"
+              }
+            }
+          },
+          {
+            "fvSubnet": {
+              "attributes": {
+                "annotation": "",
+                "childAction": "",
+                "configIssues": "",
+                "ctrl": "",
+                "debugMessage": "",
+                "descr": "",
+                "extMngdBy": "",
+                "ip": "192.0.2.1/22",
+                "ipDPLearning": "enabled",
+                "lcOwn": "local",
+                "modTs": "2021-06-24T02:27:45.803-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "name": "",
+                "nameAlias": "",
+                "preferred": "no",
+                "rn": "subnet-[192.0.2.1/22]",
+                "scope": "public",
+                "status": "",
+                "uid": "1001",
+                "userdom": "all",
+                "virtual": "no"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "vzEntry": {
+        "attributes": {
+          "accessPrivilege": "USER",
+          "annotation": "",
+          "applyToFrag": "no",
+          "arpOpc": "unspecified",
+          "childAction": "",
+          "dFromPort": "unspecified",
+          "dToPort": "unspecified",
+          "descr": "",
+          "dn": "uni/tn-common/flt-default/e-default",
+          "etherT": "unspecified",
+          "extMngdBy": "",
+          "icmpv4T": "unspecified",
+          "icmpv6T": "unspecified",
+          "lcOwn": "local",
+          "matchDscp": "unspecified",
+          "modTs": "2021-06-24T02:27:15.112-03:00",
+          "monPolDn": "",
+          "name": "default",
+          "nameAlias": "",
+          "prot": "unspecified",
+          "sFromPort": "unspecified",
+          "sToPort": "unspecified",
+          "stateful": "no",
+          "status": "",
+          "tcpRules": "",
+          "uid": "0",
+          "userdom": "all"
+        }
+      }
+    }
+  ]
+}

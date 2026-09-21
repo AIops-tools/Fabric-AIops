@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Cisco ACI (APIC) platform, read-only** — requested on issue #1. ACI's two
+  axes (tenant → VRF → bridge domain → EPG, and pod → node → interface) do not
+  fit organization → network → device, so an `aci` target maps **no** canonical
+  operation (the existing tools answer it with a teaching error) and gets three
+  ACI-native tools that take ACI references:
+  - `aci_endpoint_trace` / `aci trace --mac|--ip` — the endpoint's static path:
+    attachment (pod / leaf / interface or vPC) → EPG → BD → VRF → the EPG's
+    contracts → filter entries, plus faults whose DN names the EPG or the
+    attachment interface, as candidates. Not a reachability test, and it says so.
+  - `aci_epg_segment` / `aci segment TENANT APP EPG` — the same chain from an EPG.
+  - `aci_faults_list` / `aci faults` — faults worst severity first, one query per
+    level so the order is exact; delegated records counted apart.
+  Built and tested against real, anonymized APIC responses from the reporter's
+  production fabric (`tests/fixtures/aci/`), with the query and login mechanics
+  taken from Cisco's own SDK. Links are followed through the relation APIC
+  resolved (`tDn`), so cross-tenant references into `common` work; tag relations
+  in `missing-target` never count against the attachment; a cleared fault's
+  description is flagged as historical. Session: `aaaLogin` cookie, refreshed at
+  half its lifetime, one re-login on 401/403 (APIC reports expiry as 403), and a
+  403 that survives a fresh login is reported as a privilege problem.
+
+### Fixed
+- The read-boundary sanitiser replaced anything nested deeper than 8 levels with
+  `null`, silently. Nothing reached that depth before; the ACI trace's contract
+  filter rows sit at depth 9, and came back as `null` — a permit rule rendered as
+  no rule. The bound is now 16, pinned by a test on that field.
+- `doctor` probes an ACI target with an APIC tenant read. The generic
+  `orgs.list` probe would have raised "not supported", which `doctor` prints as
+  "Connect … failed" against a healthy APIC.
+
 ## v0.11.5 — 2026-09-17
 
 ### Fixed

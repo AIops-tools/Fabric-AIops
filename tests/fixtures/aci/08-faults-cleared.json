@@ -1,0 +1,92 @@
+{
+  "totalCount": "3",
+  "imdata": [
+    {
+      "faultInst": {
+        "attributes": {
+          "ack": "no",
+          "alert": "no",
+          "cause": "coop-ep-dampening",
+          "changeSet": "haveDampenedEPs (New: no), noOfDampenedEPs (New: 0)",
+          "childAction": "",
+          "code": "F3696",
+          "created": "2026-09-20T18:22:14.929-03:00",
+          "delegated": "no",
+          "descr": "1 EPs are in freeze state.",
+          "dn": "topology/pod-10/node-101/sys/coop/inst/dom-overlay-1/fault-F3696",
+          "domain": "access",
+          "highestSeverity": "major",
+          "lastTransition": "2026-09-20T18:32:00.728-03:00",
+          "lc": "retaining",
+          "occur": "1",
+          "origSeverity": "major",
+          "prevSeverity": "major",
+          "rule": "coop-dom-coop-ep-damp-freeze",
+          "severity": "cleared",
+          "status": "",
+          "subject": "ep-damp-freeze",
+          "title": "",
+          "type": "operational"
+        }
+      }
+    },
+    {
+      "faultInst": {
+        "attributes": {
+          "ack": "no",
+          "alert": "no",
+          "cause": "threshold-crossed",
+          "changeSet": "dropRate:8813",
+          "childAction": "",
+          "code": "F110344",
+          "created": "2026-09-20T18:30:34.070-03:00",
+          "delegated": "yes",
+          "descr": "TCA: ingress drop bytes rate(l2IngrBytesPart5min:dropRate) value 8813 fell below threshold 10000",
+          "dn": "topology/pod-20/node-302/local/svc-policyelem-id-0/uni/epp/fv-[uni/tn-tenant-B/ap-app-B/epg-epg-B]/fault-F110344",
+          "domain": "infra",
+          "highestSeverity": "warning",
+          "lastTransition": "2026-09-20T18:31:37.095-03:00",
+          "lc": "retaining",
+          "occur": "1",
+          "origSeverity": "warning",
+          "prevSeverity": "warning",
+          "rule": "tca-l2-ingr-bytes-part5min-drop-rate",
+          "severity": "cleared",
+          "status": "",
+          "subject": "counter",
+          "title": "",
+          "type": "operational"
+        }
+      }
+    },
+    {
+      "faultInst": {
+        "attributes": {
+          "ack": "no",
+          "alert": "no",
+          "cause": "threshold-crossed",
+          "changeSet": "dropRate:8813",
+          "childAction": "",
+          "code": "F110176",
+          "created": "2026-09-20T18:30:34.077-03:00",
+          "delegated": "yes",
+          "descr": "TCA: ingress drop bytes rate(l2IngrBytes5min:dropRate) value 8813 fell below threshold 10000",
+          "dn": "topology/pod-20/node-302/sys/ctx-[vxlan-500003]/bd-[vxlan-500004]/vlan-[vlan-201]/fault-F110176",
+          "domain": "infra",
+          "highestSeverity": "warning",
+          "lastTransition": "2026-09-20T18:31:37.087-03:00",
+          "lc": "retaining",
+          "occur": "1",
+          "origSeverity": "warning",
+          "prevSeverity": "warning",
+          "rule": "tca-l2-ingr-bytes5min-drop-rate",
+          "severity": "cleared",
+          "status": "",
+          "subject": "counter",
+          "title": "",
+          "type": "operational"
+        }
+      }
+    }
+  ]
+}

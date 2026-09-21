@@ -216,3 +216,50 @@ def test_cli_doctor_command_exits_with_doctor_code(isolated_home):
     result = CliRunner().invoke(app, ["doctor", "--skip-auth"])
     assert result.exit_code == 0
     assert "Skipping connectivity check" in result.output
+
+
+def test_aci_probe_does_not_report_a_healthy_apic_as_unsupported(
+    isolated_home, monkeypatch, capsys
+):
+    # ACI maps no canonical op, so the generic 'orgs.list' probe would raise
+    # "not supported" — which doctor prints as "Connect ... failed". The ACI
+    # target must be probed with an APIC read instead.
+    from tests.aci_fake import FakeConn, sample_apic
+
+    apic = sample_apic()
+    apic.add_class_rows("fvTenant", [{"fvTenant": {"attributes": {"dn": f"uni/tn-t{i}"}}}
+                                     for i in range(3)])
+    mgr = MagicMock(name="ConnectionManager")
+    mgr.return_value.connect.return_value = FakeConn(apic)
+    monkeypatch.setattr("fabric_aiops.connection.ConnectionManager", mgr)
+    _write_config(
+        isolated_home,
+        [{"name": "apic1", "platform": "aci", "base_url": "https://apic.example.com"}],
+    )
+    _store_secret("apic1", "ro-user:pa55")
+    assert run_doctor() == 0
+    out = " ".join(capsys.readouterr().out.split())
+    assert "Connected to 'apic1' (Cisco ACI APIC API) — 3 tenants visible" in out
+    assert apic.calls == [("/api/node/class/fvTenant.json", {"page": "0", "page-size": "1"})]
+
+
+def test_aci_probe_with_no_reported_count_says_so(isolated_home, monkeypatch, capsys):
+    from tests.aci_fake import FakeConn, sample_apic
+
+    apic = sample_apic()
+    apic.add_class_rows("fvTenant", [])
+
+    class _NoCount(FakeConn):
+        def get(self, path, params=None):
+            out = super().get(path, params)
+            out.pop("totalCount", None)
+            return out
+
+    mgr = MagicMock(name="ConnectionManager")
+    mgr.return_value.connect.return_value = _NoCount(apic)
+    monkeypatch.setattr("fabric_aiops.connection.ConnectionManager", mgr)
+    _write_config(isolated_home, [{"name": "apic1", "platform": "aci",
+                                   "base_url": "https://apic.example.com"}])
+    _store_secret("apic1", "ro-user:pa55")
+    assert run_doctor() == 0
+    assert "count not reported tenants visible" in " ".join(capsys.readouterr().out.split())

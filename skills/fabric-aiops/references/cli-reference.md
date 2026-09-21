@@ -53,6 +53,11 @@ fabric-aiops client connectivity <networkId> <clientId>
 
 fabric-aiops health uplink-rca [--loss-pct 5] [--latency-ms 150] [--org-id <id>]   # flagship RCA
 fabric-aiops health score [--org-id <id>]              # composite per-network health from live data
+
+# Cisco ACI targets (platform: aci) — read-only, ACI-native references
+fabric-aiops aci trace --mac <mac> | --ip <ip> [--limit 5]   # endpoint → leaf/interface → EPG → BD → VRF → contracts
+fabric-aiops aci segment <tenant> <app> <epg>                # an EPG's BD, VRF and contracts
+fabric-aiops aci faults [--severity critical] [--include-cleared] [--limit 50]   # worst-first
 ```
 
 ## Write commands (governed; risk tier in parentheses)

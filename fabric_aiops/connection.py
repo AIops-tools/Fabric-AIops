@@ -1,6 +1,6 @@
 """Connection management for network-fabric controllers.
 
-Thin httpx wrapper with per-target session reuse and two auth flows, selected
+Thin httpx wrapper with per-target session reuse and three auth flows, selected
 by the target's :class:`~fabric_aiops.platform.Platform` descriptor:
 
   * **static** (Meraki, CVP, UniFi) — a long-lived secret (Meraki API key,
@@ -13,6 +13,11 @@ by the target's :class:`~fabric_aiops.platform.Platform` descriptor:
     secret is exchanged (HTTP Basic) at the platform's ``token_path`` for a
     short-lived token (~1 h) attached per request as ``X-Auth-Token``; on a
     401 the token is refreshed once and the request retried.
+  * **aci-login** (Cisco ACI APIC) — the ``username:password`` secret is
+    POSTed as an ``aaaUser`` JSON body; APIC answers with a token and sets the
+    session cookie the httpx client then carries. The session is extended at
+    half its ``refreshTimeoutSeconds`` and, because APIC answers an expired
+    session with **403**, a 401 *or* 403 triggers one fresh login and retry.
 
 ``api_base`` comes from the target (Meraki's includes the version path,
 ``https://api.meraki.com/api/v1``; Catalyst Center / CVP / UniFi targets point
@@ -37,17 +42,25 @@ from __future__ import annotations
 import atexit
 import base64
 import logging
+import time
 from typing import Any
 
 import httpx
 
 from fabric_aiops.config import AppConfig, TargetConfig, load_config
-from fabric_aiops.platform import AUTH_FLOW_SESSION, parse_next_link
+from fabric_aiops.platform import (
+    AUTH_FLOW_ACI,
+    AUTH_FLOW_SESSION,
+    AUTH_FLOW_STATIC,
+    parse_next_link,
+)
 
 _log = logging.getLogger("fabric-aiops.connection")
 
 _TIMEOUT = 30.0
 _MAX_PAGES = 25
+#: A 401/403 this soon after an APIC login cannot be an expired session.
+_ACI_FRESH_SESSION_SEC = 30.0
 
 # Every live ConnectionManager registers here so the atexit hook can close any
 # cached httpx clients when the interpreter shuts down. The reference is strong
@@ -119,10 +132,14 @@ class FabricConnection:
     def __init__(self, target: TargetConfig, client: Any | None = None) -> None:
         self._target = target
         self._session_token: str | None = None
+        # APIC session bookkeeping (aci-login flow only).
+        self._aci_logged_in = False
+        self._aci_login_at: float | None = None
+        self._aci_refresh_after: float | None = None
         platform = target.platform_obj
-        if platform.auth_flow == AUTH_FLOW_SESSION:
-            # The secret is exchanged lazily for a short-lived token — nothing
-            # secret goes into the base headers at construction time.
+        if platform.auth_flow != AUTH_FLOW_STATIC:
+            # The secret is exchanged lazily for a session — nothing secret
+            # goes into the base headers at construction time.
             headers = platform.auth_headers("", target.auth_style)
         else:
             headers = platform.auth_headers(target.api_key, target.auth_style)
@@ -205,6 +222,117 @@ class FabricConnection:
             resp = self._client.request(method, path, headers=headers, **kwargs)
         return resp
 
+    # ── aci-login flow (Cisco ACI APIC) ──────────────────────────────────────
+    def _split_credentials(self) -> tuple[str, str]:
+        platform = self._target.platform_obj
+        secret = self._target.api_key
+        user, sep, pwd = secret.partition(":")
+        if not sep or not user or not pwd:
+            raise FabricApiError(
+                f"The {platform.label} secret must be 'username:password' (it is "
+                f"sent to POST {platform.token_path} to open a session). Re-store "
+                f"it with 'fabric-aiops secret set {self._target.name}'.",
+                path=platform.token_path,
+            )
+        return user, pwd
+
+    def _aci_login(self) -> None:
+        """Open an APIC session (``aaaLogin``); the client keeps the cookie.
+
+        The response body carries the token and ``refreshTimeoutSeconds``; the
+        session cookie APIC sets rides on every later request through the httpx
+        client's cookie jar, exactly as acitoolkit's ``requests.Session`` does.
+        The password is never logged and never echoed in an error.
+        """
+        platform = self._target.platform_obj
+        user, pwd = self._split_credentials()
+        body = {"aaaUser": {"attributes": {"name": user, "pwd": pwd}}}
+        try:
+            resp = self._client.request("POST", platform.token_path, json=body)
+        except httpx.HTTPError as exc:
+            raise FabricApiError(
+                f"Could not reach {platform.label} at {self._target.api_base} to log "
+                f"in (POST {platform.token_path}): {exc}. Check the base URL and "
+                f"that the APIC is reachable.",
+                path=platform.token_path,
+            ) from exc
+        if not (200 <= resp.status_code < 300):
+            raise FabricApiError(
+                f"APIC login failed ({resp.status_code}) at {platform.token_path}: "
+                f"{aci_error_text(self._parse(resp)) or 'no error text'}. Check the "
+                f"'username:password' secret ('fabric-aiops secret set "
+                f"{self._target.name}') and that the account may log in to this "
+                f"login domain.",
+                status_code=resp.status_code,
+                path=platform.token_path,
+            )
+        attrs = _aaa_login_attrs(self._parse(resp))
+        if not attrs.get("token"):
+            raise FabricApiError(
+                f"{platform.label} login answered {resp.status_code} but carried no "
+                f"aaaLogin token (POST {platform.token_path}) — is the base URL the "
+                f"APIC itself, not a proxy or login page?",
+                path=platform.token_path,
+            )
+        self._aci_logged_in = True
+        self._aci_login_at = time.monotonic()
+        self._aci_refresh_after = _refresh_deadline(attrs)
+
+    def _aci_refresh(self) -> None:
+        """Extend the session via ``aaaRefresh``; fall back to a fresh login.
+
+        A refresh that fails for any reason is not an error in itself — the
+        session may already have lapsed — so it degrades to a new login, and
+        only that login's failure reaches the caller.
+        """
+        platform = self._target.platform_obj
+        try:
+            resp = self._client.request("GET", platform.refresh_path)
+            ok = 200 <= resp.status_code < 300
+            attrs = _aaa_login_attrs(self._parse(resp)) if ok else {}
+        except httpx.HTTPError:
+            ok, attrs = False, {}
+        if ok and attrs.get("token"):
+            self._aci_refresh_after = _refresh_deadline(attrs)
+            return
+        self._aci_login()
+
+    def _aci_request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Issue a request in an APIC session, re-logging in once on 401/403.
+
+        APIC reports an expired session as **403** (acitoolkit re-logs in on
+        exactly that status). A 403 is also what a read the account's role may
+        not see returns. So: a 401/403 in a session opened within the last
+        ``_ACI_FRESH_SESSION_SEC`` is a privilege problem at once (no second
+        password login per denied object); an older session gets one fresh
+        login and retry, and a 403 that survives it is a privilege problem too.
+        """
+        if not self._aci_logged_in:
+            self._aci_login()
+        elif self._aci_refresh_after is not None and time.monotonic() >= self._aci_refresh_after:
+            self._aci_refresh()
+        resp = self._client.request(method, path, **kwargs)
+        if getattr(resp, "status_code", None) in (401, 403):
+            if not self._aci_session_is_fresh():
+                self._aci_login()
+                resp = self._client.request(method, path, **kwargs)
+            if getattr(resp, "status_code", None) in (401, 403):
+                raise FabricApiError(
+                    f"APIC refused {method} {path} ({resp.status_code}) in a freshly "
+                    f"opened session, so this is not an expired session: the "
+                    f"account's role/security domain cannot read this object. "
+                    f"{aci_error_text(self._parse(resp))}".strip(),
+                    status_code=resp.status_code,
+                    path=path,
+                )
+        return resp
+
+    def _aci_session_is_fresh(self) -> bool:
+        return (
+            self._aci_login_at is not None
+            and time.monotonic() - self._aci_login_at < _ACI_FRESH_SESSION_SEC
+        )
+
     # ── request core ─────────────────────────────────────────────────────────
     def _raw_request(self, method: str, path: str, **kwargs: Any) -> Any:
         """Issue a request and return the raw response, translating transport errors."""
@@ -212,6 +340,8 @@ class FabricConnection:
         try:
             if platform.auth_flow == AUTH_FLOW_SESSION:
                 return self._session_request(method, path, **kwargs)
+            if platform.auth_flow == AUTH_FLOW_ACI:
+                return self._aci_request(method, path, **kwargs)
             return self._client.request(method, path, **kwargs)
         except FabricApiError:
             raise
@@ -291,6 +421,39 @@ class FabricConnection:
 
     def close(self) -> None:
         self._client.close()
+
+
+def aci_error_text(body: Any) -> str:
+    """The ``imdata[0].error.attributes.text`` APIC puts in an error body, or ''."""
+    try:
+        return str(body["imdata"][0]["error"]["attributes"]["text"])[:300]
+    except (KeyError, IndexError, TypeError):
+        return ""
+
+
+def _aaa_login_attrs(body: Any) -> dict:
+    """``imdata[0].aaaLogin.attributes`` of a login/refresh response, or {}."""
+    try:
+        attrs = body["imdata"][0]["aaaLogin"]["attributes"]
+    except (KeyError, IndexError, TypeError):
+        return {}
+    return attrs if isinstance(attrs, dict) else {}
+
+
+def _refresh_deadline(attrs: dict) -> float | None:
+    """When to extend the session: half its lifetime, as acitoolkit does.
+
+    A missing or unparseable ``refreshTimeoutSeconds`` is *unknown*, not zero —
+    the connection then stays reactive (re-login on 401/403) instead of
+    refreshing before every request.
+    """
+    try:
+        lifetime = float(attrs.get("refreshTimeoutSeconds"))
+    except (TypeError, ValueError):
+        return None
+    if lifetime <= 0:
+        return None
+    return time.monotonic() + lifetime / 2
 
 
 class ConnectionManager:

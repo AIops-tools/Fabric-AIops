@@ -1,7 +1,7 @@
 {
   "name": "@zw008/fabric-aiops",
   "version": "0.11.5",
-  "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo.",
+  "description": "Governed Cisco Meraki + ACI fabric ops: uplink RCA, ACI endpoint trace; 37 tools with audit/undo.",
   "private": true,
   "license": "MIT",
   "homepage": "https://github.com/AIops-tools/Fabric-AIops",

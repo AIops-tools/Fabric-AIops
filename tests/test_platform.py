@@ -5,6 +5,7 @@ import pytest
 from fabric_aiops.config import TargetConfig
 from fabric_aiops.connection import FabricApiError, FabricConnection
 from fabric_aiops.platform import (
+    ACI,
     AUTH_MERAKI_KEY,
     CANONICAL_OPS,
     CANONICAL_WRITES,
@@ -31,8 +32,18 @@ def test_meraki_is_registered_and_default():
 
 
 @pytest.mark.unit
-def test_four_platforms_registered():
-    assert set(platform_names()) == {MERAKI, CATALYST, CVP, UNIFI}
+def test_five_platforms_registered():
+    assert set(platform_names()) == {MERAKI, CATALYST, CVP, UNIFI, ACI}
+
+
+@pytest.mark.unit
+def test_aci_maps_no_canonical_op_and_teaches_instead():
+    # ACI's tenant/VRF/BD/EPG and pod/node axes do not fit org → network →
+    # device; the canonical tools must refuse rather than reinterpret ids.
+    p = get_platform(ACI)
+    assert dict(p.paths) == {}
+    with pytest.raises(PlatformUnsupported, match="Cisco ACI"):
+        p.require("networks.alerts")
 
 
 @pytest.mark.unit

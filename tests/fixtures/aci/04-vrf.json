@@ -1,0 +1,37 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "fvCtx": {
+        "attributes": {
+          "annotation": "",
+          "bdEnforcedEnable": "no",
+          "childAction": "",
+          "descr": "Sample VRF description",
+          "dn": "uni/tn-common/ctx-vrf-A",
+          "extMngdBy": "",
+          "ipDataPlaneLearning": "enabled",
+          "knwMcastAct": "permit",
+          "lcOwn": "local",
+          "modTs": "2021-06-24T02:27:33.379-03:00",
+          "monPolDn": "uni/tn-common/monepg-default",
+          "name": "vrf-A",
+          "nameAlias": "",
+          "ownerKey": "",
+          "ownerTag": "",
+          "pcEnfDir": "ingress",
+          "pcEnfDirUpdated": "yes",
+          "pcEnfPref": "enforced",
+          "pcTag": "20002",
+          "scope": "500001",
+          "seg": "500001",
+          "status": "",
+          "uid": "1001",
+          "userdom": "all",
+          "vrfId": "0",
+          "vrfIndex": "0"
+        }
+      }
+    }
+  ]
+}

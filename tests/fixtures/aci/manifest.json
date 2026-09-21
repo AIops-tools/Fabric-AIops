@@ -1,0 +1,76 @@
+{
+  "purpose": "Anonymized real APIC response samples for Fabric-AIops issue 1",
+  "not_raw_capture": true,
+  "files": {
+    "02-epg-excerpt.json": {
+      "source": "Uploaded JSON file",
+      "partial": true,
+      "omitted": "All EPG children except fvRsBd, fvRsProv and fvRsCons. Root attributes retained in full.",
+      "original_child_classes": {
+        "fvCEp": 506,
+        "fvRsGraphDef": 1,
+        "fvRsProv": 1,
+        "fvRsPathAtt": 395,
+        "fvRsDomAtt": 3,
+        "fvUpdateContract": 1,
+        "fvCtrctCtxDefCont": 1,
+        "fvRsCons": 1,
+        "fvRsCustQosPol": 1,
+        "fvRsBd": 1
+      },
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
+    },
+    "01-endpoint-excerpt.json": {
+      "source": "Successful MAC-filtered response pasted in conversation",
+      "partial": true,
+      "omitted": "Some fvCEp and fvIp attributes omitted; all five supplied child/descendant objects represented. Relation attributes retained in full.",
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
+    },
+    "03-bd-excerpt.json": {
+      "source": "BD response pasted in conversation",
+      "partial": true,
+      "omitted": "Some BD attributes and six children omitted; fvRsCtx and fvSubnet retained in full.",
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
+    },
+    "04-vrf.json": {
+      "source": "VRF response pasted in conversation",
+      "partial": false,
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
+    },
+    "05-contract-excerpt.json": {
+      "source": "Contract subtree response pasted in conversation",
+      "partial": true,
+      "omitted": "Only vzBrCP, vzSubj and vzRsSubjFiltAtt retained, with all supplied attributes. Reverse references and operational definitions omitted.",
+      "count_note": "Source totalCount 31 retained unchanged; it is NOT the number of objects in this excerpt. The pasted source also contains more objects than that count; do not use this source count as a completeness assertion.",
+      "delivered_top_level_objects": 3,
+      "source_totalCount": "31"
+    },
+    "06-filter-entry.json": {
+      "source": "Entry-only filter query pasted twice; one copy retained",
+      "partial": false,
+      "limitation": "Query returned vzEntry only. No vzFilter object was captured; its DN is known from the relation and entry parent, not a fabricated filter object.",
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
+    },
+    "07-faults-active-excerpt.json": {
+      "source": "Critical fault query pasted in conversation",
+      "partial": true,
+      "omitted": "First two of 18 records retained, all attributes preserved. Remaining 16 omitted. Source totalCount remains 18, not the excerpt size.",
+      "delivered_top_level_objects": 2,
+      "source_totalCount": "18"
+    },
+    "08-faults-cleared.json": {
+      "source": "Cleared fault query pasted in conversation",
+      "partial": false,
+      "delivered_top_level_objects": 3,
+      "source_totalCount": "3"
+    }
+  },
+  "preserved": "Class/attribute keys, nesting of retained objects, states, error/fault codes, original timestamps, metrics and source totalCount.",
+  "transformed": "Environment names, endpoint/gateway IP and MAC, selected topology identifiers, VLAN/VXLAN IDs, user IDs, pcTags, free-text identifiers. common tenant and built-in default/permit names retained.",
+  "address_note": "IPv4 addresses use documentation range 192.0.2.0/24. Original /22 prefix preserved, so the sample subnet spans beyond that /24; addresses are fixtures only, not intended for routing."
+}

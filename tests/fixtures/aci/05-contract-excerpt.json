@@ -1,0 +1,89 @@
+{
+  "totalCount": "31",
+  "imdata": [
+    {
+      "vzBrCP": {
+        "attributes": {
+          "accessPrivilege": "USER",
+          "annotation": "",
+          "childAction": "",
+          "configIssues": "",
+          "descr": "",
+          "dn": "uni/tn-common/brc-contract-A",
+          "extMngdBy": "",
+          "intent": "install",
+          "lcOwn": "local",
+          "modTs": "2021-06-24T02:27:33.379-03:00",
+          "monPolDn": "",
+          "name": "contract-A",
+          "nameAlias": "",
+          "ownerKey": "",
+          "ownerTag": "",
+          "prio": "unspecified",
+          "reevaluateAll": "no",
+          "scope": "context",
+          "status": "",
+          "targetDscp": "unspecified",
+          "uid": "1001",
+          "userdom": "all"
+        }
+      }
+    },
+    {
+      "vzSubj": {
+        "attributes": {
+          "accessPrivilege": "USER",
+          "annotation": "",
+          "childAction": "",
+          "configIssues": "",
+          "consMatchT": "AtleastOne",
+          "descr": "",
+          "dn": "uni/tn-common/brc-contract-A/subj-permit",
+          "extMngdBy": "",
+          "lcOwn": "local",
+          "modTs": "2021-06-24T02:27:33.379-03:00",
+          "monPolDn": "",
+          "name": "permit",
+          "nameAlias": "",
+          "prio": "unspecified",
+          "provMatchT": "AtleastOne",
+          "revFltPorts": "yes",
+          "status": "",
+          "targetDscp": "unspecified",
+          "uid": "1001",
+          "userdom": "all"
+        }
+      }
+    },
+    {
+      "vzRsSubjFiltAtt": {
+        "attributes": {
+          "accessPrivilege": "USER",
+          "action": "permit",
+          "annotation": "",
+          "childAction": "",
+          "directives": "",
+          "dn": "uni/tn-common/brc-contract-A/subj-permit/rssubjFiltAtt-default",
+          "extMngdBy": "",
+          "forceResolve": "yes",
+          "lcOwn": "local",
+          "modTs": "2021-06-24T02:27:33.379-03:00",
+          "monPolDn": "",
+          "priorityOverride": "default",
+          "rType": "mo",
+          "state": "formed",
+          "stateQual": "none",
+          "status": "",
+          "tCl": "vzFilter",
+          "tContextDn": "",
+          "tDn": "uni/tn-common/flt-default",
+          "tRn": "flt-default",
+          "tType": "name",
+          "tnVzFilterName": "default",
+          "uid": "1001",
+          "userdom": "all"
+        }
+      }
+    }
+  ]
+}

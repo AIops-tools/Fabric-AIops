@@ -15,6 +15,9 @@ import pytest
 from typer.testing import CliRunner
 
 EXPECTED_TOOLS = {
+    "aci_endpoint_trace",
+    "aci_epg_segment",
+    "aci_faults_list",
     # organizations + overview
     "overview", "org_list", "org_get", "org_licensing", "org_admins",
     "org_device_statuses", "org_api_requests",
@@ -160,7 +163,7 @@ def test_every_mcp_tool_is_governed_by_harness():
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
-    assert len(tool_objs) == 34, (
+    assert len(tool_objs) == 37, (
         "tool count changed — update README/SKILL/server.json too"
     )
     for name, tool in tool_objs.items():

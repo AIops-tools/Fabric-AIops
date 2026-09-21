@@ -164,7 +164,13 @@ def require_org(conn: Any, org_id: str | None) -> str:
 
 
 _MAX_STR = 512
-_MAX_DEPTH = 8
+# Defensive bound against a pathological controller payload — anything deeper
+# is replaced by None, silently. It must therefore sit well above the deepest
+# result this package itself builds: the ACI endpoint trace reaches depth 9
+# (result → endpoints → endpoint → contracts → contracts → contract → subjects
+# → subject → filters → filter), and at the old bound of 8 every contract filter
+# came back as null — a permit rule reported as no rule at all.
+_MAX_DEPTH = 16
 
 
 def _sanitize_obj(obj: Any, depth: int = 0) -> Any:

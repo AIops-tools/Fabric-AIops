@@ -1,10 +1,11 @@
 # Live verification
 
-`fabric-aiops` is exercised by a **mock-only** test suite (`uv run pytest`, no
-real controller). None of its four platforms — Cisco Meraki Dashboard, Cisco
-Catalyst Center, Arista CloudVision Portal, UniFi Network — has yet been
-validated end-to-end against a live controller. Until one has, we do not claim
-it works against a real API.
+`fabric-aiops` is exercised by a test suite that runs no real controller
+(`uv run pytest`). None of its five platforms — Cisco Meraki Dashboard, Cisco
+Catalyst Center, Arista CloudVision Portal, UniFi Network, Cisco ACI — has yet
+been validated end-to-end by this tool against a live controller. Until one has,
+we do not claim it works against a real API. The ACI reads are the one part
+whose tests run on **real controller responses** (see [Cisco ACI](#cisco-aci--built-from-real-apic-responses-2026-09-21)).
 
 This document defines exactly what a live verification run must cover, and the
 criteria for calling a platform live-verified. It is deliberately checklist-shaped
@@ -215,3 +216,44 @@ without the UI**.
 accept a valid `X-API-KEY` if one were minted through the UI. That needs a real
 UniFi OS console (UDM/Cloud Key) or a UI-generated key. Do not "fix" the auth on
 the strength of this alone — verify first.
+
+## Cisco ACI — built from real APIC responses (2026-09-21)
+
+The ACI reads were written against **anonymized, real APIC responses** supplied
+by a production user on [issue #1](https://github.com/AIops-tools/Fabric-AIops/issues/1)
+(`tests/fixtures/aci/`, with the contributor's own `manifest.json` of what each
+file omits), and their query mechanics against Cisco's own SDK
+(`acitoolkit`). This is stronger than the other platforms' mock basis and
+weaker than a live run: the fixtures are curated excerpts, and this tool has
+not yet talked to an APIC.
+
+### Provenance, per object and mechanism
+
+| What | Basis |
+|---|---|
+| `fvCEp` + `fvRsCEpToPathEp` + `fvIp` + `fvReportingNode` + tag relations (nested, `rsp-subtree=full`, MAC filter) | **real response** |
+| `fvAEPg` + `fvRsBd` / `fvRsProv` / `fvRsCons` (nested children) | **real response** (3 of 911 children kept) |
+| `fvBD` + `fvRsCtx` + `fvSubnet`; `fvCtx` | **real response** |
+| `vzBrCP` / `vzSubj` / `vzRsSubjFiltAtt` (flat subtree rows); `vzEntry` | **real response** (`vzFilter` itself not captured) |
+| `faultInst` (active delegated pair; cleared/retaining incl. F3696) | **real response** |
+| `aaaLogin` body + token/`refreshTimeoutSeconds`, `aaaRefresh`, re-login on 403, `page`/`page-size`, comma lists in `rsp-subtree-class` / `target-subtree-class` | **Cisco SDK** (`acitoolkit/acisession.py`, `acitoolkit.py`) |
+| IP lookup via `class/fvIp` + `eq(fvIp.addr,…)`; `fvRsConsIf` / `fvRsProtBy` / `vzInTerm` / `vzOutTerm` / `vzRsFiltAtt` shapes; `faultInst` under `topology/pod-P/node-N` subtrees | **documentation only** — not in the samples |
+
+### Live checklist (ACI)
+
+- [ ] `doctor` logs in and reports the tenant count the APIC GUI shows.
+- [ ] `aci trace --mac` on a known endpoint: pod / leaf / interface match the
+      GUI's endpoint tracker; EPG → BD → VRF match the tenant view.
+- [ ] Same endpoint by `--ip` returns the same endpoint (the IP path is
+      documentation-built — this is its first real check).
+- [ ] A vPC-attached endpoint: `attachment.kind == "vpc"` with both leaf ids.
+- [ ] An EPG consuming a contract from `common`: the contract and its filter
+      entries resolve across the tenant boundary.
+- [ ] A session left idle past `refreshTimeoutSeconds`, then used again:
+      one re-login, no error (from a long-running MCP server, not the CLI —
+      the CLI logs in fresh every call and cannot exercise this).
+- [ ] A read-only user denied a tenant: the error says privilege, not expiry.
+- [ ] `aci faults` counts per severity match the GUI's fault summary.
+
+**Not built yet** (need real responses first, as above): leaf/spine inventory
+(`fabricNode`, `topSystem`) and interface state (`l1PhysIf`).

@@ -31,8 +31,8 @@ What the tool *does* guarantee is that you can always see what happened:
 |---|---|
 | "Log everything you do, over both MCP and the CLI" | Every call is audited to `~/.fabric-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. Reversible writes also record an undo token capturing the *prior* state. |
 | "Don't invent a value when a field is missing" | A field the controller did not return comes back as `null`, never as `""`. Absent and empty are distinguishable in the payload. |
-| "Tell me if the output was cut off" | Anything with a `limit` returns `{"<items>": [...], "returned": N, "limit": L, "truncated": true/false}`, where `<items>` names what was listed — `devices`, `alerts`, `topApplications`, `worst`, `driftedNetworks` or `undos`. Read the key the tool documents rather than assuming `devices`. Truncation is measured against the full result, not guessed from a length coincidence. |
-| "Preserve the ordering / tell me what's most urgent" | The ranked analyses return worst-first and carry the numbers that produced each ranking (`avgLossPct`, `score`, `alertPenalty`), so priority is in the payload rather than implied by list position. |
+| "Tell me if the output was cut off" | Anything with a `limit` returns `{"<items>": [...], "returned": N, "limit": L, "truncated": true/false}`, where `<items>` names what was listed — `devices`, `alerts`, `topApplications`, `worst`, `driftedNetworks` or `undos`; on ACI, `endpoints`, `faults`, `contracts` or `entries`. Read the key the tool documents rather than assuming `devices`. Truncation is measured against the full result, not guessed from a length coincidence. |
+| "Preserve the ordering / tell me what's most urgent" | The ranked analyses return worst-first and carry the numbers that produced each ranking (`avgLossPct`, `score`, `alertPenalty`), so priority is in the payload rather than implied by list position. The ACI reads carry an explicit `rank` on findings and faults. |
 | "Confirm before anything destructive" | Destructive operations require a `--dry-run`-able preview + double confirmation at the CLI. |
 | "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
 | "Don't guess at an unsupported platform" | An operation a platform does not map raises a teaching `PlatformUnsupported` error naming the platform — never a silent no-op the model can mistake for success. |
@@ -45,7 +45,7 @@ Copy this into your agent's system prompt:
 ```text
 You operate a network fabric through its CONTROLLER API using the fabric-aiops
 MCP tools (Cisco Meraki Dashboard, Cisco Catalyst Center, Arista CloudVision
-Portal, or UniFi Network, depending on the configured target).
+Portal, UniFi Network, or Cisco ACI, depending on the configured target).
 
 TOOL USE
 - Before answering any question about the current fabric, you MUST call a tool.
@@ -79,6 +79,26 @@ IDENTIFIERS — keep these straight, they are not interchangeable
 - Never pass an organization id where a network id is expected, or a device name
   where a serial is expected. If you do not have the right id, call the list
   tool that returns it (org_list, network_list, device_inventory) first.
+
+CISCO ACI (aci_* tools)
+- aci_endpoint_trace is NOT a reachability test. "staticPathResolved": true
+  means the fabric is configured to carry the endpoint — never say traffic flows.
+- relatedFaultCandidates are matched by DN only. Never present one as the cause
+  of a problem; call them candidates. If its "faults" is null, no scan
+  succeeded: say related faults are unknown, never "no faults".
+- tagRelations in state "missing-target" are policy-tag lookups. They are not a
+  path or attachment failure — do not report them as one.
+- A section that is null with an entry in "errors" was NOT read. Say it could
+  not be read; never describe it as empty or absent.
+- A cleared fault keeps the description it had when raised. Judge it by
+  severity and lifecycle, not by its text.
+- Fault rows are records, not incidents: a "delegated": true row mirrors a
+  fault on another object. Do not count the pair as two problems.
+- "notFound" means the fabric has not learned the address now, or it sits in a
+  tenant this account cannot see — not that the host is down.
+- Anything listed in "notChecked" (vzAny, taboo, imported contracts, preferred
+  groups, service graphs) was not evaluated; do not claim it allows or blocks
+  traffic.
 
 SCOPE
 - Separate observation from interpretation. State what the tools returned, then

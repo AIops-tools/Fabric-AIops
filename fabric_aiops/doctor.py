@@ -77,20 +77,29 @@ def run_doctor(skip_auth: bool = False) -> int:
 
     from fabric_aiops.connection import ConnectionManager
     from fabric_aiops.ops._util import op_get_pages
+    from fabric_aiops.ops.aci_common import probe_tenants
+    from fabric_aiops.platform import ACI
 
     mgr = ConnectionManager(config)
     for target in config.targets:
         try:
             conn = mgr.connect(target.name)
-            # 'orgs.list' is the canonical top-of-hierarchy probe on every
-            # platform (Meraki organizations / Catalyst Center sites / CVP
-            # containers / UniFi sites) — it exercises auth (incl. the
-            # Catalyst Center session-token exchange) plus one real read.
-            rows = op_get_pages(conn, "orgs.list")
-            count = len(rows) if isinstance(rows, list) else 0
+            if target.platform_obj.name == ACI:
+                # ACI maps no canonical op, so 'orgs.list' would fail with an
+                # "unsupported" error that reads as a connection failure. Probe
+                # with the APIC login plus one tenant read instead.
+                count = probe_tenants(conn)
+            else:
+                # 'orgs.list' is the canonical top-of-hierarchy probe on every
+                # other platform (Meraki organizations / Catalyst Center sites /
+                # CVP containers / UniFi sites) — it exercises auth (incl. the
+                # Catalyst Center session-token exchange) plus one real read.
+                rows = op_get_pages(conn, "orgs.list")
+                count = len(rows) if isinstance(rows, list) else 0
+            seen = "count not reported" if count is None else f"{count}"
             _console.print(
                 f"[green]✓ Connected to '{target.name}' ({target.platform_obj.label}) "
-                f"— {count} {target.platform_obj.org_noun} visible[/]"
+                f"— {seen} {target.platform_obj.org_noun} visible[/]"
             )
         except Exception as exc:  # noqa: BLE001 — connectivity is a status, not a crash
             _console.print(f"[red]✗ Connect to '{target.name}' failed: {exc}[/]")

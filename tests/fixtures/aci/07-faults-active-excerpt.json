@@ -1,0 +1,63 @@
+{
+  "totalCount": "18",
+  "imdata": [
+    {
+      "faultInst": {
+        "attributes": {
+          "ack": "no",
+          "alert": "no",
+          "cause": "threshold-crossed",
+          "changeSet": "dropRate:16676",
+          "childAction": "",
+          "code": "F93713",
+          "created": "2026-09-14T05:08:58.083-03:00",
+          "delegated": "no",
+          "descr": "TCA: received dropped packets rate(compRcvdErrPkts15min:dropRate) value 16676 raised above threshold 10000",
+          "dn": "comp/prov-VMM-A/ctrlr-[vds-A]-vmmctrlr-A/hv-host-10001/hpnic-nic3/fault-F93713",
+          "domain": "infra",
+          "highestSeverity": "critical",
+          "lastTransition": "2026-09-14T05:08:58.083-03:00",
+          "lc": "raised",
+          "occur": "1",
+          "origSeverity": "critical",
+          "prevSeverity": "warning",
+          "rule": "tca-comp-rcvd-err-pkts15min-drop-rate",
+          "severity": "critical",
+          "status": "",
+          "subject": "counter",
+          "title": "",
+          "type": "operational"
+        }
+      }
+    },
+    {
+      "faultInst": {
+        "attributes": {
+          "ack": "no",
+          "alert": "no",
+          "cause": "threshold-crossed",
+          "changeSet": "dropRate:16676",
+          "childAction": "",
+          "code": "F93713",
+          "created": "2026-09-14T05:08:58.099-03:00",
+          "delegated": "yes",
+          "descr": "TCA: received dropped packets rate(compRcvdErrPkts15min:dropRate) value 16676 raised above threshold 10000",
+          "dn": "comp/prov-VMM-A/ctrlr-[vds-A]-vmmctrlr-A/hv-host-10001/fault-F93713",
+          "domain": "infra",
+          "highestSeverity": "critical",
+          "lastTransition": "2026-09-14T05:08:58.099-03:00",
+          "lc": "raised",
+          "occur": "1",
+          "origSeverity": "critical",
+          "prevSeverity": "warning",
+          "rule": "tca-comp-rcvd-err-pkts15min-drop-rate",
+          "severity": "critical",
+          "status": "",
+          "subject": "counter",
+          "title": "",
+          "type": "operational"
+        }
+      }
+    }
+  ]
+}

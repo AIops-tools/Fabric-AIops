@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from fabric_aiops.cli._common import cli_errors
+from fabric_aiops.cli.aci import aci_app
 from fabric_aiops.cli.client import client_app
 from fabric_aiops.cli.device import device_app
 from fabric_aiops.cli.doctor import doctor_cmd
@@ -28,6 +29,7 @@ app.add_typer(network_app, name="network")
 app.add_typer(device_app, name="device")
 app.add_typer(client_app, name="client")
 app.add_typer(health_app, name="health")
+app.add_typer(aci_app, name="aci")
 app.add_typer(remediate_app, name="remediate")
 app.add_typer(secret_app, name="secret")
 app.add_typer(undo_app, name="undo")

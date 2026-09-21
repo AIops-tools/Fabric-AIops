@@ -1,0 +1,136 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "fvAEPg": {
+        "attributes": {
+          "annotation": "",
+          "childAction": "",
+          "configIssues": "",
+          "configSt": "applied",
+          "descr": "Sample VLAN 101; subnet 192.0.2.0/22",
+          "dn": "uni/tn-tenant-A/ap-app-A/epg-epg-A",
+          "exceptionTag": "",
+          "extMngdBy": "",
+          "floodOnEncap": "disabled",
+          "fwdCtrl": "",
+          "hasMcastSource": "no",
+          "isAttrBasedEPg": "no",
+          "isSharedSrvMsiteEPg": "no",
+          "lcOwn": "local",
+          "matchT": "AtleastOne",
+          "modTs": "2024-04-16T19:55:22.543-03:00",
+          "monPolDn": "uni/tn-common/monepg-default",
+          "name": "epg-A",
+          "nameAlias": "",
+          "pcEnfPref": "unenforced",
+          "pcTag": "20001",
+          "pcTagAllocSrc": "idmanager",
+          "prefGrMemb": "exclude",
+          "prio": "unspecified",
+          "scope": "500001",
+          "shutdown": "no",
+          "status": "",
+          "triggerSt": "triggerable",
+          "txId": "10000000000000000001",
+          "uid": "1001",
+          "userdom": "all"
+        },
+        "children": [
+          {
+            "fvRsProv": {
+              "attributes": {
+                "accessPrivilege": "USER",
+                "annotation": "",
+                "childAction": "",
+                "ctrctUpd": "ctrct",
+                "extMngdBy": "",
+                "forceResolve": "yes",
+                "intent": "install",
+                "lcOwn": "local",
+                "matchT": "AtleastOne",
+                "modTs": "2026-03-19T15:52:27.685-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "prio": "unspecified",
+                "rType": "mo",
+                "rn": "rsprov-contract-A",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "vzBrCP",
+                "tContextDn": "",
+                "tDn": "uni/tn-common/brc-contract-A",
+                "tRn": "brc-contract-A",
+                "tType": "name",
+                "tnVzBrCPName": "contract-A",
+                "triggerSt": "triggerable",
+                "uid": "1002",
+                "updateCollection": "no",
+                "userdom": ":all:"
+              }
+            }
+          },
+          {
+            "fvRsCons": {
+              "attributes": {
+                "accessPrivilege": "USER",
+                "annotation": "",
+                "childAction": "",
+                "ctrctUpd": "ctrct",
+                "deplInfo": "",
+                "extMngdBy": "",
+                "forceResolve": "yes",
+                "intent": "install",
+                "lcOwn": "local",
+                "modTs": "2021-06-24T02:27:46.027-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "prio": "unspecified",
+                "rType": "mo",
+                "rn": "rscons-contract-A",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "vzBrCP",
+                "tContextDn": "",
+                "tDn": "uni/tn-common/brc-contract-A",
+                "tRn": "brc-contract-A",
+                "tType": "name",
+                "tnVzBrCPName": "contract-A",
+                "triggerSt": "triggerable",
+                "uid": "1001",
+                "updateCollection": "no",
+                "userdom": "all"
+              }
+            }
+          },
+          {
+            "fvRsBd": {
+              "attributes": {
+                "annotation": "",
+                "childAction": "",
+                "extMngdBy": "",
+                "forceResolve": "yes",
+                "lcOwn": "local",
+                "modTs": "2021-06-24T02:27:45.803-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "rType": "mo",
+                "rn": "rsbd",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fvBD",
+                "tContextDn": "",
+                "tDn": "uni/tn-tenant-A/BD-bd-A",
+                "tRn": "BD-bd-A",
+                "tType": "name",
+                "tnFvBDName": "bd-A",
+                "uid": "0",
+                "userdom": "all"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "id": "fabric-aiops",
   "name": "Fabric AIops",
-  "description": "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo.",
+  "description": "Governed Cisco Meraki + ACI fabric ops: uplink RCA, ACI endpoint trace; 37 tools with audit/undo.",
   "skills": [
     "./skills"
   ],

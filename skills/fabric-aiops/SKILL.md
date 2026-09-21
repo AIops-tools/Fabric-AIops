@@ -2,7 +2,7 @@
 name: fabric-aiops
 slug: fabric-aiops
 displayName: "Fabric AIops"
-summary: "Governed Cisco Meraki fabric ops: uplink RCA, health score, drift; 34 tools with audit/undo."
+summary: "Governed Cisco Meraki + ACI fabric ops: uplink RCA, ACI endpoint trace; 37 tools with audit/undo."
 license: MIT
 homepage: https://github.com/AIops-tools/Fabric-AIops
 tags: [aiops, mcp, governance, fabric]
@@ -33,9 +33,9 @@ compatibility: >
 
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, Ubiquiti, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
 
-Governed network-fabric controller operations — **34 MCP tools** over **four platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, token/runaway budget guard, undo-token recording, and descriptive risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed network-fabric controller operations — **37 MCP tools** over **five platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart; Cisco ACI APIC: read-only endpoint path trace, EPG segment and faults), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, token/runaway budget guard, undo-token recording, and descriptive risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
-> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. The test suite is mock-based; no platform has yet been exercised against a live controller (see `docs/VERIFICATION.md`).
+> **Standalone**: the governance harness is bundled in the package (`fabric_aiops.governance`) — fabric-aiops has no external skill-family dependency. No platform has yet been exercised by this tool against a live controller; the ACI reads are tested against real, anonymized APIC responses from a production fabric (see `docs/VERIFICATION.md`).
 
 ## Platform support
 
@@ -44,6 +44,7 @@ Governed network-fabric controller operations — **34 MCP tools** over **four p
 | Cisco Meraki Dashboard | `meraki` | full (all reads + all 8 writes) | API key (Bearer / X-Cisco-Meraki-API-Key) |
 | Cisco Catalyst Center | `catalyst` | read subset: sites (as orgs/networks), device+site+client health, issues→alerts, inventory, interface stats | `username:password` → short-lived X-Auth-Token (auto-refresh on 401) |
 | Arista CloudVision Portal | `cvp` | read subset: containers (as orgs/networks), inventory (+ complianceCode drift signal), events→alerts, users→admins | service-account token (Bearer) |
+| Cisco ACI (APIC) | `aci` | **no canonical op** — three ACI-native reads instead: endpoint path trace (MAC/IP → leaf/interface → EPG → BD → VRF → contracts → filter entries, plus DN-matched fault candidates), EPG segment, fabric faults | `username:password` → `aaaLogin` session cookie (refreshed; one re-login on 401/403) |
 | UniFi Network | `unifi` | read subset: sites (as orgs/networks), stat/device inventory+statuses, stat/health, alarms→alerts, stat/sta clients, device port_table→switch ports; **plus the device-restart write** (cmd/devmgr) | API key (`X-API-KEY`, stateless); base_url = classic `https://<host>:8443` or UniFi OS console `https://<console>/proxy/network` |
 
 Ops a platform does not map — and **every write on catalyst/cvp (on unifi, every write except reboot)** — return a teaching "not supported on `<platform>` yet — open an issue or PR" error, never a silent no-op. Full matrix in the repo README.
@@ -58,6 +59,7 @@ Ops a platform does not map — and **every write on catalyst/cvp (on unifi, eve
 | **Devices** | inventory (by model), status, uplinks, switch ports, SSIDs | 5 | 5 read |
 | **Clients** | list, detail, usage, connectivity | 4 | 4 read |
 | **Health (flagship)** | uplink loss/latency RCA, network health score, config template drift | 3 | 3 read |
+| **Cisco ACI** (APIC targets) | endpoint path trace, EPG segment, fabric faults | 3 | 3 read |
 | **Remediation** | reboot, claim, remove, bind, unbind | 5 | 5 write (high) |
 | | update device, update VLAN | 2 | 2 write (medium) |
 | | blink LEDs | 1 | 1 write (low) |
@@ -90,6 +92,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 - Score fleet health per network (`health score` / `network_health_score`): a composite 0-100, worst first, every component shown
 - List/inspect organizations, networks, devices (by model), and clients
 - Reboot/blink a device, update device or VLAN attributes (reversible), claim/remove devices, or bind/unbind a config template — all with dry-run + double-confirm
+- On a Cisco ACI fabric: find where an endpoint (MAC/IP) attaches and which EPG / BD / VRF / contracts carry it (`aci trace` / `aci_endpoint_trace`), inspect an EPG's segment (`aci segment`), or list faults worst-first (`aci faults`)
 
 **Do NOT use when** the target is OT/industrial equipment (use industrial-aiops), a hypervisor, a storage appliance, a backup product, a container cluster, or device-level CLI/SSH network automation.
 
@@ -101,6 +104,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | Cisco Catalyst Center (DNA Center): site/device/client health, issues, inventory | **fabric-aiops** (this skill, `platform: catalyst`) |
 | Arista CloudVision Portal: inventory, compliance drift signal, events | **fabric-aiops** (this skill, `platform: cvp`) |
 | UniFi Network (self-hosted controller / UniFi OS console): site health, alarms, clients, device restart | **fabric-aiops** (this skill, `platform: unifi`) |
+| Cisco ACI (APIC): endpoint location, EPG/BD/VRF/contract chain, fabric faults | **fabric-aiops** (this skill, `platform: aci`) |
 | OT / industrial edge (Modbus, OPC-UA, PLC, PROFINET) | the **industrial-aiops** line |
 | Hypervisor VM lifecycle (power, snapshot, migrate) | a hypervisor ops skill |
 | Container/cluster lifecycle | a cluster ops skill |
@@ -140,6 +144,14 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 4. `fabric-aiops remediate blink-leds <serial> --duration 30` → low-risk physical confirmation that you are at the right box in the rack
 5. `fabric-aiops health score` → confirm the network's score recovers once the device reports in
 6. **Failure branch**: wrong network — `fabric-aiops undo apply <id>` or `fabric-aiops remediate remove <networkId> <serial>`. Note `fabric-aiops remediate reboot <serial>` is `no undo` by construction (a reboot has no safe inverse); it records only the before-state, so use it last, not as a first response.
+
+### "This VM can't reach its database" — reconstruct the ACI path (read-only)
+
+1. `fabric-aiops aci trace --ip <vm-ip>` → the endpoint's attachment (pod / leaf / interface or vPC), its EPG → bridge domain → VRF, the contracts the EPG provides/consumes down to filter entries, and faults whose DN names the EPG or the interface
+2. Read `findings` first (worst-first, each with its signal): an unformed attachment or an unresolved BD/VRF/contract relation is where the configured chain breaks
+3. `fabric-aiops aci trace --ip <db-ip>` → the peer's chain; compare VRFs and whether one EPG provides a contract the other consumes
+4. `fabric-aiops aci faults` → fabric-wide faults worst-first, when the chain itself is clean
+5. **Failure branch**: `notFound` means the fabric has not learned the address now (silent hosts age out) — not that the host is down. A section that is `null` with an entry in `errors` was not read; do not report it as absent. `staticPathResolved: true` is configuration, not proof traffic flows — this is not a reachability test, and vzAny / taboo / preferred-group rules are listed in `notChecked`, not evaluated.
 
 ### Offline analysis (no live controller)
 

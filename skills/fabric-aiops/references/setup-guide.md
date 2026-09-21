@@ -46,6 +46,17 @@ Set the target's `org_id` to the site's short name (e.g. `default`) —
 device-scoped calls (device get, switch ports, restart) use it as the
 `/api/s/{site}/` scope.
 
+**Cisco ACI (`platform: aci`)** — use an APIC local or remote user whose role is
+**read-only** (every ACI call this tool makes is a GET) and whose security
+domains cover the tenants you want to trace (a tenant outside them answers 403,
+which the tool reports as a privilege problem, not an expired session). Store
+the secret as a single `username:password` string. fabric-aiops logs in via
+`POST /api/aaaLogin.json`, carries the session cookie APIC returns, extends the
+session via `/api/aaaRefresh.json` at half its `refreshTimeoutSeconds`, and logs
+in again once if APIC answers 401/403. A `base_url` is required
+(`https://<apic-host>`); `org_id` is not used. ACI answers the Meraki-shaped
+tools with a teaching error — use `fabric-aiops aci trace | segment | faults`.
+
 ## 3. Onboard
 
 ```bash

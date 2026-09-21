@@ -1,0 +1,104 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "fvCEp": {
+        "attributes": {
+          "dn": "uni/tn-tenant-A/ap-app-A/epg-epg-A/cep-02:00:00:00:00:01",
+          "mac": "02:00:00:00:00:01",
+          "name": "02:00:00:00:00:01",
+          "bdDn": "uni/tn-tenant-A/BD-bd-A",
+          "vrfDn": "uni/tn-common/ctx-vrf-A",
+          "encap": "vlan-101",
+          "fabricPathDn": "topology/pod-20/paths-301/pathep-[eth1/10]",
+          "lcC": "learned",
+          "modTs": "2026-04-29T13:17:35.210-03:00"
+        },
+        "children": [
+          {
+            "fvRsCEpToPathEp": {
+              "attributes": {
+                "childAction": "",
+                "forceResolve": "yes",
+                "lcC": "learned",
+                "lcOwn": "local",
+                "modTs": "2026-04-29T13:17:35.210-03:00",
+                "rType": "mo",
+                "rn": "rscEpToPathEp-[topology/pod-20/paths-301/pathep-[eth1/10]]",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fabricAPathEp",
+                "tDn": "topology/pod-20/paths-301/pathep-[eth1/10]",
+                "tType": "mo"
+              }
+            }
+          },
+          {
+            "fvIp": {
+              "attributes": {
+                "addr": "192.0.2.200",
+                "bdDn": "uni/tn-tenant-A/BD-bd-A",
+                "vrfDn": "uni/tn-common/ctx-vrf-A",
+                "fabricPathDn": "topology/pod-20/paths-301/pathep-[eth1/10]",
+                "rn": "ip-[192.0.2.200]"
+              },
+              "children": [
+                {
+                  "fvRsToEpIpTag": {
+                    "attributes": {
+                      "childAction": "",
+                      "forceResolve": "yes",
+                      "lcOwn": "local",
+                      "modTs": "2026-04-29T13:17:35.210-03:00",
+                      "rType": "mo",
+                      "rn": "rstoEpIpTag",
+                      "state": "missing-target",
+                      "stateQual": "none",
+                      "status": "",
+                      "tCl": "fvEpIpTag",
+                      "tDn": "uni/tn-tenant-A/eptags/epiptag-[192.0.2.200]-vrf-A",
+                      "tType": "mo"
+                    }
+                  }
+                },
+                {
+                  "fvReportingNode": {
+                    "attributes": {
+                      "childAction": "",
+                      "createTs": "2026-04-06T17:49:39.192-03:00",
+                      "id": "301",
+                      "lcC": "",
+                      "lcOwn": "local",
+                      "modTs": "2026-04-29T13:17:35.210-03:00",
+                      "rn": "node-301",
+                      "status": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "fvRsToEpMacTag": {
+              "attributes": {
+                "childAction": "",
+                "forceResolve": "yes",
+                "lcOwn": "local",
+                "modTs": "2026-04-29T13:17:35.210-03:00",
+                "rType": "mo",
+                "rn": "rstoEpMacTag",
+                "state": "missing-target",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fvATp",
+                "tDn": "uni/tn-tenant-A/eptags/epmactag-02:00:00:00:00:01-[bd-A]",
+                "tType": "mo"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

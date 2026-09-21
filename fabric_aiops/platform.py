@@ -20,6 +20,11 @@ Registered platforms:
   * ``unifi`` — UniFi Network controller REST API (self-hosted controller or a
     UniFi OS console via a ``/proxy/network`` base URL; read coverage plus the
     device-restart write; sites stand in for organizations/networks).
+  * ``aci`` — Cisco ACI APIC REST API. Maps **no** canonical op: ACI's
+    hierarchy (tenant → VRF → BD → EPG, and fabric → pod → node) does not fit
+    org → network → device, so it is served by ACI-native reads
+    (:mod:`fabric_aiops.ops.aci`) that take ACI references (tenant, dn, MAC/IP)
+    instead of borrowing Meraki ids.
 
 Adding a controller is a new descriptor module under
 ``fabric_aiops/platforms/`` — registry entries plus request/response
@@ -53,6 +58,7 @@ MERAKI = "meraki"
 CATALYST = "catalyst"
 CVP = "cvp"
 UNIFI = "unifi"
+ACI = "aci"
 
 DEFAULT_MERAKI_BASE_URL = "https://api.meraki.com/api/v1"
 
@@ -64,6 +70,7 @@ AUTH_STYLES = (AUTH_BEARER, AUTH_MERAKI_KEY)
 # Auth flows: how the secret becomes request authentication.
 AUTH_FLOW_STATIC = "static"  # the stored secret goes straight into a header
 AUTH_FLOW_SESSION = "session-token"  # exchange the secret for a short-lived token
+AUTH_FLOW_ACI = "aci-login"  # APIC aaaLogin: JSON body in, session cookie out
 
 # Canonical operations the ops layer speaks. The reference platform (meraki)
 # implements every key; other platforms implement the subset that maps cleanly
@@ -205,6 +212,9 @@ class Platform:
     auth_flow: str = AUTH_FLOW_STATIC
     token_path: str = ""
     token_header: str = ""
+    # Session-refresh endpoint for flows that can extend a live session
+    # without re-sending the password (APIC ``aaaRefresh``).
+    refresh_path: str = ""
     # Static-flow platforms whose key rides a vendor-specific header (e.g.
     # ``X-API-KEY``) set it here; empty means bearer / style-selected header.
     api_key_header: str = ""
@@ -391,12 +401,14 @@ __all__ = [
     "CATALYST",
     "CVP",
     "UNIFI",
+    "ACI",
     "DEFAULT_MERAKI_BASE_URL",
     "AUTH_BEARER",
     "AUTH_MERAKI_KEY",
     "AUTH_STYLES",
     "AUTH_FLOW_STATIC",
     "AUTH_FLOW_SESSION",
+    "AUTH_FLOW_ACI",
     "CANONICAL_READS",
     "CANONICAL_WRITES",
     "CANONICAL_OPS",

@@ -1,11 +1,12 @@
 # fabric-aiops capabilities
 
-> 34 MCP tools (25 read, 9 write) over four platforms —
+> 37 MCP tools (28 read, 9 write) over five platforms —
 > Cisco Meraki Dashboard (reference, full read+write), Cisco Catalyst Center
 > (read subset), Arista CloudVision Portal (read subset), UniFi Network (read
-> subset + device restart). All API paths are modelled from the public API
-> shapes and need live verification. Community-maintained; not affiliated with
-> Cisco/Meraki/Arista/Ubiquiti.
+> subset + device restart), Cisco ACI APIC (three ACI-native reads). The first
+> four platforms' API paths are modelled from the public API shapes and need live
+> verification; the ACI reads are built against real, anonymized APIC responses.
+> Community-maintained; not affiliated with Cisco/Meraki/Arista/Ubiquiti.
 
 Meraki hierarchy: **organizations → networks → devices**. Device models carry a
 product-type prefix: **MX** appliance, **MS** switch, **MR** wireless AP, **MV**
@@ -37,7 +38,7 @@ unifi, every write except reboot)** — returns a teaching "not supported on
 <platform> yet — open an issue or PR" error instead of a silent no-op. The
 full per-op matrix is in the repo README.
 
-## Read tools (25)
+## Read tools (28)
 
 ### Overview + organizations
 | Tool | Meraki API path | Returns |
@@ -87,6 +88,29 @@ full per-op matrix is in the repo README.
 live from a `target`/`org_id`. `network_health_score` and `config_template_drift`
 are injected-only (they score data you already hold, e.g. from
 `org_device_statuses` / `device_uplinks`).
+
+### Cisco ACI (APIC targets only)
+
+ACI maps **no canonical operation** — the tools above answer an `aci` target
+with a teaching error. These three take ACI references instead:
+
+| Tool | APIC queries (all GET) | Returns |
+|------|------------------------|---------|
+| `aci_endpoint_trace` | `class/fvCEp` by `eq(fvCEp.mac,…)` + `rsp-subtree=full` (or `class/fvIp` by `eq(fvIp.addr,…)`, then the owning `fvCEp`); the EPG / BD / VRF / contract / filter reads of `aci_epg_segment`; `faultInst` under the EPG and under each attachment leaf | `endpoints[]` (`returned/limit/truncated`), each with `attachment` (pod, nodes, interface or vPC, `state`, `tCl` as sent), `tagRelations` (listed apart — never a path verdict), `epg`/`bd`/`vrf`/`contracts`, `relatedFaultCandidates` (DN-matched, active first), `staticPathResolved`, ranked `findings`, `errors`, `notChecked`; `notFound` when the address is not learned |
+| `aci_epg_segment` | `mo/<epg>` `rsp-subtree=children&rsp-subtree-class=fvRsBd,fvRsProv,fvRsCons,fvRsConsIf,fvRsProtBy`; `mo/<bd>` (`fvRsCtx,fvSubnet`); `mo/<vrf>`; `mo/<contract>` `query-target=subtree&target-subtree-class=vzBrCP,vzSubj,vzRsSubjFiltAtt,vzInTerm,vzOutTerm,vzRsFiltAtt`; `mo/<filter>` `target-subtree-class=vzEntry` | `epg`, `bd` (subnets), `vrf` (`policyEnforcement`), `contracts` (subjects → filters with action/direction → entries), `segmentResolved`, ranked `findings`, `errors`, `notChecked` |
+| `aci_faults_list` | `class/faultInst` by `eq(faultInst.severity,…)`, one query per level in severity order, `page-size` = what is still needed + 1 | `faults[]` (`rank`, `active` from severity, `delegated`, `scope`/`pod`/`node`/`aboutDn`), `returned/limit/truncated`, `bySeverity.serverReported`, `delegatedRecords` |
+
+Every link is the relation APIC resolved (`tDn`), so cross-tenant links into
+`common` are followed. A failed EPG / BD / VRF read leaves its section `null`
+with an entry in `errors` and `segmentResolved`/`staticPathResolved` `null` —
+never an empty section. A failed contract read stays in the list as
+`{"dn": …, "read": false}` with `contracts.complete: false`; if no fault scan
+succeeds, `relatedFaultCandidates.faults` is `null`, not `[]`. A 2xx that is not
+an APIC response (no `imdata` — e.g. a proxy login page) is an error, never an
+empty result. An empty APIC answer is reported as "does not exist, or not
+visible to this account's security domain" — APIC answers both the same way. Not evaluated: vzAny, taboo contracts, imported contract interfaces,
+preferred-group peers, service graphs / L3Out. Leaf/spine inventory and
+interface state are not implemented yet.
 
 ### Undo
 | Tool | Meraki API path | Returns |
