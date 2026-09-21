@@ -191,3 +191,19 @@ def test_unknown_refresh_lifetime_is_not_zero():
     assert _refresh_deadline({"refreshTimeoutSeconds": "abc"}) is None
     assert _refresh_deadline({"refreshTimeoutSeconds": "0"}) is None
     assert _refresh_deadline({"refreshTimeoutSeconds": "600"}) > time.monotonic()
+
+
+def test_a_refused_login_is_not_retried_per_read(apic, monkeypatch):
+    # A changed password must not become one password attempt per read — a
+    # trace makes several reads and would lock the account.
+    conn, st = apic
+    monkeypatch.setenv("FABRIC_APIC1_APIKEY", "ro-user:changed-elsewhere")
+    for _ in range(5):
+        with pytest.raises(FabricApiError):
+            conn.get("/api/node/class/fvCEp.json")
+    assert len(st["logins"]) == 1
+    real = time.monotonic
+    monkeypatch.setattr(time, "monotonic", lambda: real() + 61)
+    monkeypatch.setenv("FABRIC_APIC1_APIKEY", f"ro-user:{PASSWORD}")
+    assert conn.get("/api/node/class/fvCEp.json")["imdata"] == []  # retried after the pause
+    assert len(st["logins"]) == 2

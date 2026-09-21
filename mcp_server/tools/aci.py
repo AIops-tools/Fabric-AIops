@@ -39,9 +39,10 @@ def aci_endpoint_trace(
         are null in that case, not false.
       * A cleared fault keeps the description it had when raised; judge it by
         severity/lifecycle, not by its text.
-      * 'contracts.complete: false' means a contract or filter read failed (its
-        entry says 'read: false' or has 'entries: null'); the EPG → BD → VRF
-        verdict is unaffected.
+      * 'contracts.complete: false' means a contract or filter was not read or
+        not returned (its entry says 'read: false', 'exists: false' or has
+        'entries: null') — its rules are unknown, not absent. The EPG → BD →
+        VRF verdict is unaffected.
       * An 'epg' with 'supported: false' is a parent object this read does not
         trace (e.g. an L2Out external EPG) — the chain is undetermined, not broken.
       * 'notFound' means the fabric has not learned the address now, or it is in
@@ -97,7 +98,8 @@ def aci_epg_segment(
         target: Target name from config (must be 'platform: aci').
 
     Returns dict: {epg, bd, vrf, contracts:{contracts, returned, limit,
-        truncated, filters, filtersTruncated}, segmentResolved, notChecked,
+        truncated, filters, filtersTruncated, complete}, segmentResolved,
+        notChecked,
         findings:[{rank, severity, signal, cause, action}], errors}.
     """
     return aci_segment.segment_for(_get_connection(target), tenant, app, epg)

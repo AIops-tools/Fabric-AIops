@@ -22,7 +22,10 @@
   in `missing-target` never count against the attachment; a cleared fault's
   description is flagged as historical. Session: `aaaLogin` cookie, refreshed at
   half its lifetime, one re-login on 401/403 (APIC reports expiry as 403), and a
-  403 that survives a fresh login is reported as a privilege problem.
+  403 that survives a fresh login is reported as a privilege problem. A refused
+  login is not retried for 60 s, so a changed password cannot become one password
+  attempt per read. A contract or filter APIC does not return is "rules unknown"
+  (`contracts.complete: false`), never "no rules".
 
 ### Fixed
 - The read-boundary sanitiser replaced anything nested deeper than 8 levels with

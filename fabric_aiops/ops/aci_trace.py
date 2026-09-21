@@ -189,7 +189,10 @@ def _related_faults(conn: Any, epg_dn: str, paths: list[dict], limit: int, f: Fi
     for row in (got or ([], False))[0]:
         matched.append({**row, "matchedBy": "fault is on the EPG or an object under it"})
     for p in (p for p in paths if mit.relation_formed(p)):
-        iface = p["endpoint"] if p["kind"] == "interface" else None
+        # A FEX port's faults live under the FEX's own interface naming, not
+        # the leaf's phys-[ethX/Y]; matching the leaf would pick a different
+        # port. FEX ports are therefore not interface-matched (see the note).
+        iface = p["endpoint"] if p["kind"] == "interface" and not p["fex"] else None
         for node in p["nodes"]:
             node_dn = f"topology/pod-{p['pod']}/node-{node}"
             got = _scan(conn, node_dn, NODE_FAULT_SCAN, f)
@@ -235,8 +238,8 @@ def _related_faults(conn: Any, epg_dn: str, paths: list[dict], limit: int, f: Fi
             "Matched by DN: the fault sits on this EPG, on the attachment "
             "interface, or on the leaf's deployed copy of this EPG's policy. A "
             "match is proximity, not cause. Interface faults are matched only for "
-            "a single physical interface — for a vPC or port-channel, member-port "
-            "faults are not matched. scanTruncated is true where a scan hit its "
+            "a single physical leaf interface — for a vPC, a port-channel or a FEX "
+            "port, interface faults are not matched. scanTruncated is true where a scan hit its "
             "page limit, null where it failed (listed in scansFailed); "
             "unscannedAttachments are attachment DNs whose leaves could not be "
             "parsed, so they were not scanned."

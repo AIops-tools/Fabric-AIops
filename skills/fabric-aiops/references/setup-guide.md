@@ -47,9 +47,13 @@ device-scoped calls (device get, switch ports, restart) use it as the
 `/api/s/{site}/` scope.
 
 **Cisco ACI (`platform: aci`)** — use an APIC local or remote user whose role is
-**read-only** (every ACI call this tool makes is a GET) and whose security
-domains cover the tenants you want to trace (a tenant outside them answers 403,
-which the tool reports as a privilege problem, not an expired session). Store
+**read-only** (every ACI read is a GET; only the login is a POST) and whose
+security domains cover the tenants you want to trace. An object outside them
+may come back as an empty answer — reported as "does not exist, or not visible
+to this account" because APIC answers both the same way — or as a 403, reported
+as a privilege problem, not an expired session. After a refused login the tool
+waits 60 s before sending the password again, so a changed password cannot turn
+into one login attempt per read. Store
 the secret as a single `username:password` string. fabric-aiops logs in via
 `POST /api/aaaLogin.json`, carries the session cookie APIC returns, extends the
 session via `/api/aaaRefresh.json` at half its `refreshTimeoutSeconds`, and logs

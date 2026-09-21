@@ -157,7 +157,13 @@ def sample_apic() -> FakeApic:
         apic.add_mo(load(name)["imdata"][0])
     contract = load("05-contract-excerpt")["imdata"]
     apic.add_subtree_rows("uni/tn-common/brc-contract-A", contract)
-    apic.add_subtree_rows("uni/tn-common/flt-default", load("06-filter-entry")["imdata"])
+    # The sample captured the entry only; this vzFilter row is SYNTHETIC (just
+    # its dn/name), standing in for the queried object a subtree answer carries
+    # — as the real contract-subtree sample carried its own vzBrCP.
+    apic.add_subtree_rows("uni/tn-common/flt-default", [
+        {"vzFilter": {"attributes": {"dn": "uni/tn-common/flt-default", "name": "default"}}},
+        *load("06-filter-entry")["imdata"],
+    ])
     faults = load("07-faults-active-excerpt")["imdata"] + load("08-faults-cleared")["imdata"]
     apic.add_class_rows("faultInst", faults)
     # IP lookup: fvIp rows as a class query returns them (flat, with dn).

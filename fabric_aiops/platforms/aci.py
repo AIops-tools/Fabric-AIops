@@ -34,7 +34,7 @@ register(
             "fabric-aiops logs in via POST /api/aaaLogin.json, carries the "
             "session cookie APIC returns, extends it via /api/aaaRefresh.json and "
             "logs in again once when APIC answers 401/403. Use an account whose "
-            "role is read-only: every ACI read here is a GET."
+            "role is read-only: every ACI read here is a GET (only the login is a POST)."
         ),
         requires_base_url=True,
         auth_flow=AUTH_FLOW_ACI,

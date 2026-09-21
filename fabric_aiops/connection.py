@@ -61,6 +61,9 @@ _TIMEOUT = 30.0
 _MAX_PAGES = 25
 #: A 401/403 this soon after an APIC login cannot be an expired session.
 _ACI_FRESH_SESSION_SEC = 30.0
+#: After a refused APIC login, do not send the password again for this long —
+#: a changed password must not become one login attempt per read (lockout).
+_ACI_LOGIN_BACKOFF_SEC = 60.0
 
 # Every live ConnectionManager registers here so the atexit hook can close any
 # cached httpx clients when the interpreter shuts down. The reference is strong
@@ -135,6 +138,7 @@ class FabricConnection:
         # APIC session bookkeeping (aci-login flow only).
         self._aci_logged_in = False
         self._aci_login_at: float | None = None
+        self._aci_login_failed_at: float | None = None
         self._aci_refresh_after: float | None = None
         platform = target.platform_obj
         if platform.auth_flow != AUTH_FLOW_STATIC:
@@ -245,6 +249,15 @@ class FabricConnection:
         The password is never logged and never echoed in an error.
         """
         platform = self._target.platform_obj
+        failed_at = self._aci_login_failed_at
+        if failed_at is not None and time.monotonic() - failed_at < _ACI_LOGIN_BACKOFF_SEC:
+            raise FabricApiError(
+                f"Not retrying the APIC login: it was refused less than "
+                f"{int(_ACI_LOGIN_BACKOFF_SEC)} s ago, and repeating it per read could "
+                f"lock the account. Fix the secret ('fabric-aiops secret set "
+                f"{self._target.name}') and retry after the pause.",
+                path=platform.token_path,
+            )
         user, pwd = self._split_credentials()
         body = {"aaaUser": {"attributes": {"name": user, "pwd": pwd}}}
         try:
@@ -257,6 +270,7 @@ class FabricConnection:
                 path=platform.token_path,
             ) from exc
         if not (200 <= resp.status_code < 300):
+            self._aci_login_failed_at = time.monotonic()
             raise FabricApiError(
                 f"APIC login failed ({resp.status_code}) at {platform.token_path}: "
                 f"{aci_error_text(self._parse(resp)) or 'no error text'}. Check the "
@@ -268,6 +282,7 @@ class FabricConnection:
             )
         attrs = _aaa_login_attrs(self._parse(resp))
         if not attrs.get("token"):
+            self._aci_login_failed_at = time.monotonic()
             raise FabricApiError(
                 f"{platform.label} login answered {resp.status_code} but carried no "
                 f"aaaLogin token (POST {platform.token_path}) — is the base URL the "
@@ -275,6 +290,7 @@ class FabricConnection:
                 path=platform.token_path,
             )
         self._aci_logged_in = True
+        self._aci_login_failed_at = None
         self._aci_login_at = time.monotonic()
         self._aci_refresh_after = _refresh_deadline(attrs)
 

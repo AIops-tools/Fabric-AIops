@@ -270,6 +270,10 @@ def _read_contract(conn: Any, dn: str, f: Findings) -> dict | None:
     if objs is None:
         return None
     roots = [o for o in mit.of_class(objs, "vzBrCP") if o["dn"] == dn]
+    if not roots:
+        f.add("medium", f"APIC returned no contract at {dn}",
+              _NOT_RETURNED.format(what="contract the EPG relation points at"),
+              "Its rules are unknown — check the contract and the account's security domains.")
     a = roots[0]["attrs"] if roots else {}
     subjects = []
     for subj in mit.of_class(objs, "vzSubj"):
@@ -313,15 +317,25 @@ def _entry_row(obj: dict) -> dict:
 
 
 def _read_filter(conn: Any, dn: str, entry_limit: int, f: Findings) -> dict:
+    # vzFilter is asked for alongside its entries: a subtree query returns the
+    # queried object itself (the real contract-subtree response carried its own
+    # vzBrCP), so a missing vzFilter row separates "filter not returned" from
+    # "filter with no entries" — otherwise both read as a filter with no rules.
     objs = f.step("filter", dn, lambda: _read_mo(conn, dn, {
         "query-target": "subtree",
-        "target-subtree-class": "vzEntry",
+        "target-subtree-class": "vzFilter,vzEntry",
     }))
     if objs is None:
         return {"dn": dn, "entries": None}
+    if not any(o["dn"] == dn for o in mit.of_class(objs, "vzFilter")):
+        f.add("medium", f"APIC returned no filter at {dn}",
+              _NOT_RETURNED.format(what="filter a contract subject points at"),
+              "Its rules are unknown — check the filter and the account's security domains.")
+        return {"dn": dn, "exists": False, "entries": None}
     entries = [_entry_row(o) for o in mit.of_class(objs, "vzEntry")]
     return {
         "dn": dn,
+        "exists": True,
         "name": mit.rn_value(dn, "flt-"),
         "tenant": mit.tenant_of(dn),
         "entries": entries[:entry_limit],
@@ -361,7 +375,9 @@ def _read_contracts(conn: Any, epg: dict, limits: dict, f: Findings) -> dict:
     filter_dns = _distinct([r["tDn"] for r in filter_rels if mit.relation_formed(r)])
     filters = [_read_filter(conn, dn, limits["entries"], f)
                for dn in filter_dns[: limits["filters"]]]
-    unread = any(c.get("read") is False for c in contracts) or any(
+    unread = any(
+        c.get("read") is False or c.get("exists") is False for c in contracts
+    ) or any(
         flt.get("entries") is None for flt in filters
     )
     return {

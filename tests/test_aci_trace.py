@@ -330,3 +330,36 @@ def test_ip_lookup_with_a_failed_endpoint_read_cannot_claim_not_truncated():
     out = _trace(apic, mac=None, ip="192.0.2.200")
     assert out["endpoints"] == [] and out["truncated"] is None
     assert out["lookupErrors"] and "notFound" not in out
+
+
+# ── second review (2026-09-21) ──────────────────────────────────────────────
+
+
+def test_unreturned_filter_is_unknown_rules_not_no_rules():
+    apic = sample_apic()
+    del apic.subtree_extra["uni/tn-common/flt-default"]
+    ep = _one(_trace(apic))
+    (flt,) = ep["contracts"]["filters"]
+    assert flt == {"dn": "uni/tn-common/flt-default", "exists": False, "entries": None}
+    assert ep["contracts"]["complete"] is False
+    assert any("no filter" in f["signal"] for f in ep["findings"])
+
+
+def test_unreturned_contract_is_not_complete():
+    apic = sample_apic()
+    del apic.subtree_extra["uni/tn-common/brc-contract-A"]
+    ep = _one(_trace(apic))
+    assert ep["contracts"]["contracts"][0]["exists"] is False
+    assert ep["contracts"]["complete"] is False
+    assert any("no contract" in f["signal"] for f in ep["findings"])
+
+
+def test_fex_port_is_not_matched_to_the_leafs_own_interface_faults():
+    apic = sample_apic()
+    rel = apic.class_rows["fvCEp"][0]["fvCEp"]["children"][0]["fvRsCEpToPathEp"]["attributes"]
+    rel["tDn"] = "topology/pod-20/paths-301/extpaths-111/pathep-[eth1/10]"
+    node = "topology/pod-20/node-301"
+    apic.add_subtree_rows(node, [_fault(f"{node}/sys/phys-[eth1/10]/fault-F1394", "major")])
+    cands = _one(_trace(apic))["relatedFaultCandidates"]
+    assert cands["faults"] == []
+    assert "FEX" in cands["note"]
