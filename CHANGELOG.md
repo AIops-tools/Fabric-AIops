@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.12.0 — 2026-09-21
 
 ### Added
 - **Cisco ACI (APIC) platform, read-only** — requested on issue #1. ACI's two
