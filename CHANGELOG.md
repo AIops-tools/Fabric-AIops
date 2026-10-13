@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.12.1 — 2026-10-13
+
+### Fixed
+- **`aci_endpoint_trace` reported a false "the endpoint may have moved" for every
+  vPC-learned endpoint** (issue #1). APIC 5.3(2f) records such an endpoint's
+  `fabricPathDn` on one member leaf (`paths-301/pathep-[vpc_x]`) while the formed
+  relation names the pair (`protpaths-301-302/pathep-[vpc_x]`); an exact string
+  comparison read that as a disagreement. A member-leaf path in the same pod,
+  with the same endpoint, now matches. Paths behind a FEX are deliberately not
+  excused (no FEX sample yet — the pairing APIC records there would be a guess). New
+  field `endpoint.recordedPathMatch`: `exact` / `vpc-member` / `differs` / null.
+  A real `differs` stays a medium finding but no longer asserts a move — the two
+  records disagreeing does not show one. Tested against the reporter's real vPC
+  response (`tests/fixtures/aci/09-endpoint-vpc.json`); this comparison had no
+  test before.
+
 ## v0.12.0 — 2026-09-21
 
 ### Added
