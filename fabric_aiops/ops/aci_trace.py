@@ -145,8 +145,11 @@ def _path_findings(paths: list[dict], f: Findings) -> None:
               "Check the interface / vPC named in 'attachment' and its policy on the leaf.")
 
 
-def _cross_check(cep: dict, paths: list[dict], segment: dict, f: Findings) -> None:
-    """Flag disagreement between the endpoint's own DNs and the resolved chain."""
+def _cross_check(cep: dict, paths: list[dict], segment: dict, f: Findings) -> str | None:
+    """Flag disagreement between the endpoint's own DNs and the resolved chain.
+
+    Returns how the recorded ``fabricPathDn`` relates to the formed attachment.
+    """
     pairs = (
         ("bridge domain", cep["bdDn"], (segment.get("bd") or {}).get("dn")),
         ("VRF", cep["vrfDn"], (segment.get("vrf") or {}).get("dn")),
@@ -157,11 +160,59 @@ def _cross_check(cep: dict, paths: list[dict], segment: dict, f: Findings) -> No
                   f"The endpoint's recorded {what} differs from the one its EPG resolves to.",
                   "The endpoint may have been learned before a BD/VRF change; re-check "
                   "after it is re-learned.")
-    formed = {p["tDn"] for p in paths if mit.relation_formed(p)}
-    if cep["fabricPathDn"] and formed and cep["fabricPathDn"] not in formed:
+    match = _recorded_path_match(cep["fabricPathDn"], paths)
+    if match == "differs":
         f.add("medium", f"fabricPathDn {cep['fabricPathDn']} is not a formed attachment",
-              "The endpoint's recorded path differs from its formed attachment relation.",
-              "Treat the attachment relation as current; the endpoint may have moved.")
+              "The endpoint's recorded path names a different leaf, pod or interface "
+              "than its formed attachment relation. The two disagree; that does not "
+              "by itself show the endpoint moved.",
+              "Treat the formed attachment relation as current and look the endpoint "
+              "up again: a recorded path that converges was transient; one that "
+              "persists is worth checking on both leaves.")
+    return match
+
+
+def _is_vpc_member(recorded: dict, pair: dict) -> bool:
+    """A single-leaf path DN naming one member of a formed vPC attachment.
+
+    APIC 5.3(2f) records a vPC-learned endpoint's ``fabricPathDn`` as
+    ``paths-<one member>/pathep-[<vPC policy group>]`` while its formed
+    relation names ``protpaths-<a>-<b>/pathep-[<same group>]`` (real sample,
+    Fabric-AIops #1). Same pod, same endpoint, a member leaf is the same
+    attachment written per-leaf.
+
+    Paths behind a FEX are deliberately not excused: no FEX sample has been
+    seen, and which leaf/FEX pairing APIC would record there is a guess. They
+    stay ``differs`` — whose wording claims no move — until a real one arrives.
+    """
+    return (
+        pair["kind"] == "vpc"
+        and recorded["kind"] in ("interface", "port-channel")
+        and len(recorded["nodes"]) == 1
+        and not recorded["fex"]
+        and not pair["fex"]
+        and recorded["pod"] == pair["pod"]
+        and recorded["endpoint"] == pair["endpoint"]
+        and recorded["nodes"][0] in pair["nodes"]
+    )
+
+
+def _recorded_path_match(recorded_dn: str | None, paths: list[dict]) -> str | None:
+    """How ``fabricPathDn`` relates to the formed attachment(s).
+
+    ``exact`` / ``vpc-member`` agree; ``differs`` is a real disagreement;
+    ``None`` means there is nothing to compare (no recorded path, or no formed
+    relation) — unknown, never a match.
+    """
+    formed = [p for p in paths if mit.relation_formed(p)]
+    if not recorded_dn or not formed:
+        return None
+    if any(p["tDn"] == recorded_dn for p in formed):
+        return "exact"
+    recorded = mit.parse_path_dn(recorded_dn)
+    if any(_is_vpc_member(recorded, p) for p in formed):
+        return "vpc-member"
+    return "differs"
 
 
 # ─── related faults ─────────────────────────────────────────────────────────
@@ -267,7 +318,7 @@ def _endpoint(conn: Any, root: dict, objs: list[dict], limits: dict, fault_limit
     _path_findings(paths, f)
     epg_dn = mit.parent_dn(dn)
     segment = build_segment(conn, epg_dn, limits, f)
-    _cross_check(cep, paths, segment, f)
+    cep = {**cep, "recordedPathMatch": _cross_check(cep, paths, segment, f)}
     faults = _related_faults(conn, epg_dn, paths, fault_limit, f)
     attached = any(mit.relation_formed(p) for p in paths)
     resolved = segment["segmentResolved"]

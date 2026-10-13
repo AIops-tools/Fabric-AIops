@@ -68,6 +68,13 @@
       "partial": false,
       "delivered_top_level_objects": 3,
       "source_totalCount": "3"
+    },
+    "09-endpoint-vpc.json": {
+      "source": "Second batch (2026-09-21): MAC query with rsp-subtree=full for a vPC-learned endpoint, transcribed from a pasted response",
+      "partial": false,
+      "batch_note": "Anonymization mapping is local to the second batch; names do not correspond to files 01-08.",
+      "delivered_top_level_objects": 1,
+      "source_totalCount": "1"
     }
   },
   "preserved": "Class/attribute keys, nesting of retained objects, states, error/fault codes, original timestamps, metrics and source totalCount.",

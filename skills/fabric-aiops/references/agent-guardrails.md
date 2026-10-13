@@ -88,6 +88,11 @@ CISCO ACI (aci_* tools)
   succeeded: say related faults are unknown, never "no faults".
 - tagRelations in state "missing-target" are policy-tag lookups. They are not a
   path or attachment failure — do not report them as one.
+- "recordedPathMatch": "vpc-member" is normal: APIC records a vPC-learned
+  endpoint's fabricPathDn on one member leaf. It is not a move. Even
+  "differs" only says two APIC records disagree — never claim the endpoint
+  moved from that alone. null means it was not compared (no recorded path or
+  no formed relation) — not that the paths agree.
 - A section that is null with an entry in "errors" was NOT read. Say it could
   not be read; never describe it as empty or absent.
 - A cleared fault keeps the description it had when raised. Judge it by

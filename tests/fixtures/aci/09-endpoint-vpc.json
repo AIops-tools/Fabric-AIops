@@ -1,0 +1,181 @@
+{
+  "totalCount": "1",
+  "imdata": [
+    {
+      "fvCEp": {
+        "attributes": {
+          "annotation": "",
+          "baseEpgDn": "",
+          "bdDn": "uni/tn-tenant_a/BD-bd_backup",
+          "childAction": "",
+          "contName": "",
+          "dn": "uni/tn-tenant_a/ap-app_a/epg-backup.servers/cep-02:00:00:00:00:01",
+          "encap": "vlan-146",
+          "esgUsegDn": "",
+          "extMngdBy": "",
+          "fabricPathDn": "topology/pod-2/paths-301/pathep-[vpc_storage_a]",
+          "hostingServer": "",
+          "id": "0",
+          "idepdn": "",
+          "lcC": "learned",
+          "lcOwn": "local",
+          "mac": "02:00:00:00:00:01",
+          "mcastAddr": "not-applicable",
+          "modTs": "2026-07-09T05:38:45.961-03:00",
+          "monPolDn": "uni/tn-common/monepg-default",
+          "name": "02:00:00:00:00:01",
+          "nameAlias": "",
+          "reportingControllerName": "",
+          "status": "",
+          "uid": "0",
+          "userdom": "all",
+          "uuid": "",
+          "vmmSrc": "",
+          "vrfDn": "uni/tn-common/ctx-vrf_a"
+        },
+        "children": [
+          {
+            "fvIp": {
+              "attributes": {
+                "addr": "192.0.2.61",
+                "annotation": "",
+                "baseEpgDn": "",
+                "bdDn": "uni/tn-tenant_a/BD-bd_backup",
+                "childAction": "",
+                "createTs": "2024-11-26T22:45:25.267-03:00",
+                "debugMACMessage": "",
+                "esgUsegDn": "",
+                "extMngdBy": "",
+                "fabricPathDn": "topology/pod-2/paths-301/pathep-[vpc_storage_a]",
+                "flags": "",
+                "lcOwn": "local",
+                "modTs": "2026-07-09T05:38:45.961-03:00",
+                "monPolDn": "uni/tn-common/monepg-default",
+                "rn": "ip-[192.0.2.61]",
+                "status": "",
+                "uid": "0",
+                "userdom": "all",
+                "vrfDn": "uni/tn-common/ctx-vrf_a"
+              },
+              "children": [
+                {
+                  "fvReportingNode": {
+                    "attributes": {
+                      "childAction": "",
+                      "createTs": "2026-03-27T00:35:26.767-03:00",
+                      "id": "301",
+                      "lcC": "",
+                      "lcOwn": "local",
+                      "modTs": "2026-03-27T00:37:19.307-03:00",
+                      "rn": "node-301",
+                      "status": ""
+                    }
+                  }
+                },
+                {
+                  "fvReportingNode": {
+                    "attributes": {
+                      "childAction": "",
+                      "createTs": "2026-03-27T02:25:43.468-03:00",
+                      "id": "302",
+                      "lcC": "",
+                      "lcOwn": "local",
+                      "modTs": "2026-03-27T02:29:41.306-03:00",
+                      "rn": "node-302",
+                      "status": ""
+                    }
+                  }
+                },
+                {
+                  "fvRsToEpIpTag": {
+                    "attributes": {
+                      "childAction": "",
+                      "forceResolve": "yes",
+                      "lcOwn": "local",
+                      "modTs": "2024-11-26T22:47:30.965-03:00",
+                      "rType": "mo",
+                      "rn": "rstoEpIpTag",
+                      "state": "missing-target",
+                      "stateQual": "none",
+                      "status": "",
+                      "tCl": "fvEpIpTag",
+                      "tDn": "uni/tn-tenant_a/eptags/epiptag-[192.0.2.61]-vrf_a",
+                      "tType": "mo"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "fvRsToEpMacTag": {
+              "attributes": {
+                "childAction": "",
+                "forceResolve": "yes",
+                "lcOwn": "local",
+                "modTs": "2024-09-30T15:21:16.894-03:00",
+                "rType": "mo",
+                "rn": "rstoEpMacTag",
+                "state": "missing-target",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fvATp",
+                "tDn": "uni/tn-tenant_a/eptags/epmactag-02:00:00:00:00:01-[bd_backup]",
+                "tType": "mo"
+              }
+            }
+          },
+          {
+            "fvRsCEpToPathEp": {
+              "attributes": {
+                "childAction": "",
+                "forceResolve": "yes",
+                "lcC": "learned",
+                "lcOwn": "local",
+                "modTs": "2026-07-09T05:38:41.968-03:00",
+                "rType": "mo",
+                "rn": "rscEpToPathEp-[topology/pod-2/protpaths-301-302/pathep-[vpc_storage_a]]",
+                "state": "formed",
+                "stateQual": "none",
+                "status": "",
+                "tCl": "fabricAPathEp",
+                "tDn": "topology/pod-2/protpaths-301-302/pathep-[vpc_storage_a]",
+                "tType": "mo"
+              },
+              "children": [
+                {
+                  "fvReportingNode": {
+                    "attributes": {
+                      "childAction": "",
+                      "createTs": "1969-12-31T21:00:00.000-03:00",
+                      "id": "302",
+                      "lcC": "learned",
+                      "lcOwn": "local",
+                      "modTs": "2026-07-09T05:38:41.968-03:00",
+                      "rn": "node-302",
+                      "status": ""
+                    }
+                  }
+                },
+                {
+                  "fvReportingNode": {
+                    "attributes": {
+                      "childAction": "",
+                      "createTs": "1969-12-31T21:00:00.000-03:00",
+                      "id": "301",
+                      "lcC": "learned",
+                      "lcOwn": "local",
+                      "modTs": "2026-07-09T05:38:45.961-03:00",
+                      "rn": "node-301",
+                      "status": ""
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

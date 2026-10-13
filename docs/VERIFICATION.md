@@ -237,17 +237,44 @@ not yet talked to an APIC.
 | `vzBrCP` / `vzSubj` / `vzRsSubjFiltAtt` (flat subtree rows); `vzEntry` | **real response** (`vzFilter` itself not captured) |
 | `faultInst` (active delegated pair; cleared/retaining incl. F3696) | **real response** |
 | `aaaLogin` body + token/`refreshTimeoutSeconds`, `aaaRefresh`, re-login on 403, `page`/`page-size`, comma lists in `rsp-subtree-class` / `target-subtree-class` | **Cisco SDK** (`acitoolkit/acisession.py`, `acitoolkit.py`) |
+| A vPC-learned `fvCEp` (`fabricPathDn` on one member leaf, formed relation on `protpaths-A-B`, both `fvReportingNode`s) — `09-endpoint-vpc.json`, APIC 5.3(2f) | **real response** (second batch, 2026-09-21) |
 | IP lookup via `class/fvIp` + `eq(fvIp.addr,…)`; `fvRsConsIf` / `fvRsProtBy` / `vzInTerm` / `vzOutTerm` / `vzRsFiltAtt` shapes; `faultInst` under `topology/pod-P/node-N` subtrees | **documentation only** — not in the samples |
+
+### Reporter's run against 0.12.0 (APIC 5.3(2f), switches n9000-15.3(2f))
+
+Reported on issue #1 (2026-09-21), from the reporter's CLI runs — summaries,
+not fixtures, except the vPC endpoint above:
+
+- MAC and IP lookup of an endpoint on a single physical interface;
+  EPG → BD → VRF including cross-tenant references into `common`; contract and
+  filter expansion; `aci segment`; critical-fault listing with limit/truncation.
+- A vPC endpoint: `kind: vpc`, `nodes: [301, 302]`, `attachmentFormed`,
+  `segmentResolved` and `staticPathResolved` all true; tag relations in
+  `missing-target` kept apart; fault scans of the EPG and both leaves with no
+  failures, and the stated limit that vPC member interfaces are not matched.
+- **One false positive, fixed in 0.12.1**: that vPC endpoint drew a medium
+  "recorded path differs … may have moved" finding, because APIC records its
+  `fabricPathDn` as `paths-301/…` while the formed relation is
+  `protpaths-301-302/…` (same pathep). That is one attachment written per-leaf.
+  The comparison now recognises a member-leaf path (`recordedPathMatch:
+  "vpc-member"`), and a real disagreement no longer asserts a move. A vPC
+  behind a FEX is **not** excused: no FEX sample exists, so it stays
+  `differs` until one does.
+
+Still not exercised live: a populated fault record from a vPC leaf, a complete
+direct `fvIp` response, session refresh in a long-running MCP server, and
+privilege errors. Inventory excerpts (`fabricNode`/`topSystem`, one leaf) and
+one `l1PhysIf` page were received; inventory is still not built.
 
 ### Live checklist (ACI)
 
 - [ ] `doctor` logs in and reports the tenant count the APIC GUI shows.
-- [ ] `aci trace --mac` on a known endpoint: pod / leaf / interface match the
+- [x] `aci trace --mac` on a known endpoint: pod / leaf / interface match the
       GUI's endpoint tracker; EPG → BD → VRF match the tenant view.
-- [ ] Same endpoint by `--ip` returns the same endpoint (the IP path is
+- [x] Same endpoint by `--ip` returns the same endpoint (the IP path is
       documentation-built — this is its first real check).
-- [ ] A vPC-attached endpoint: `attachment.kind == "vpc"` with both leaf ids.
-- [ ] An EPG consuming a contract from `common`: the contract and its filter
+- [x] A vPC-attached endpoint: `attachment.kind == "vpc"` with both leaf ids.
+- [x] An EPG consuming a contract from `common`: the contract and its filter
       entries resolve across the tenant boundary.
 - [ ] A session left idle past `refreshTimeoutSeconds`, then used again:
       one re-login, no error (from a long-running MCP server, not the CLI —

@@ -58,6 +58,13 @@ def aci_endpoint_trace(
         fault_limit: Max related-fault candidates per endpoint (default 20).
         target: Target name from config (must be 'platform: aci').
 
+    endpoint.recordedPathMatch compares APIC's fabricPathDn with the formed
+    attachment: "exact", "vpc-member" (APIC records a vPC-learned endpoint on one
+    member leaf, e.g. paths-301 for protpaths-301-302 — the same attachment, not
+    a move), "differs" (a medium finding that does not claim a move), or null (no recorded
+    path, or no formed relation — not compared; never a match). Paths behind a FEX
+    are not excused as vPC members.
+
     Returns dict: {query, endpoints:[{endpoint, ips, attachment, attachmentFormed,
         tagRelations, epg, bd, vrf, contracts, segmentResolved, notChecked,
         relatedFaultCandidates, staticPathResolved, findings:[{rank, severity,

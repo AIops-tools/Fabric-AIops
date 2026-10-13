@@ -11,6 +11,12 @@ relying on a count or on an attribute being absent:
 - `06-filter-entry.json` is entries only — the `vzFilter` object itself was
   not captured.
 
+`09-endpoint-vpc.json` comes from a **second batch** (issue #1, 2026-09-21, APIC
+5.3(2f)): one vPC-learned endpoint, a complete posted response with
+`rsp-subtree=full`. Its pseudonyms are local to that batch and do not line up
+with files 01–08 (the reporter says so explicitly), so it is served on its own
+in tests. It is transcribed from a pasted response, not a byte-for-byte export.
+
 One change was made here, and only for this repository's brand-isolation rule:
 in `07-faults-active-excerpt.json` the VMM provider and controller tokens in the
 two fault DNs were renamed (`prov-VMM-A`, `vmmctrlr-A`, `nic3`). Nothing in the
