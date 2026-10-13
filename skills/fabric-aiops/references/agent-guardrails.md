@@ -40,7 +40,7 @@ What the tool *does* guarantee is that you can always see what happened:
 ## What still needs a prompt
 
 These are model-behaviour problems the harness cannot fix from the outside.
-Copy this into your agent's system prompt:
+Recommended setup for a local model (adapt it to your agent client):
 
 ```text
 You operate a network fabric through its CONTROLLER API using the fabric-aiops
