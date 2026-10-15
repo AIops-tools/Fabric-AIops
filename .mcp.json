@@ -5,7 +5,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "fabric-aiops==0.13.0",
+        "fabric-aiops==0.14.0",
         "fabric-aiops-mcp"
       ]
     }
