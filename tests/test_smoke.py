@@ -80,14 +80,14 @@ def test_all_modules_import():
         "fabric_aiops.cli.remediate",
         "fabric_aiops.cli.overview",
         "fabric_aiops.cli.doctor",
-        "mcp_server.server",
-        "mcp_server._shared",
-        "mcp_server.tools.organizations",
-        "mcp_server.tools.networks",
-        "mcp_server.tools.devices",
-        "mcp_server.tools.clients",
-        "mcp_server.tools.health",
-        "mcp_server.tools.remediation",
+        "fabric_aiops.mcp_server.server",
+        "fabric_aiops.mcp_server._shared",
+        "fabric_aiops.mcp_server.tools.organizations",
+        "fabric_aiops.mcp_server.tools.networks",
+        "fabric_aiops.mcp_server.tools.devices",
+        "fabric_aiops.mcp_server.tools.clients",
+        "fabric_aiops.mcp_server.tools.health",
+        "fabric_aiops.mcp_server.tools.remediation",
     ):
         importlib.import_module(name)
 
@@ -149,7 +149,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
 
 @pytest.mark.unit
 def test_mcp_list_tools_exposes_expected_tools():
-    from mcp_server.server import mcp
+    from fabric_aiops.mcp_server.server import mcp
 
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
@@ -159,7 +159,7 @@ def test_mcp_list_tools_exposes_expected_tools():
 @pytest.mark.unit
 def test_every_mcp_tool_is_governed_by_harness():
     """Every registered tool callable must carry the @governed_tool marker."""
-    from mcp_server import _shared
+    from fabric_aiops.mcp_server import _shared
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
@@ -176,7 +176,7 @@ def test_every_mcp_tool_is_governed_by_harness():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import remediation as rem
+    from fabric_aiops.mcp_server.tools import remediation as rem
 
     for name in HIGH_RISK:
         assert getattr(rem, name)._risk_level == "high", name
@@ -188,7 +188,7 @@ def test_write_tools_have_correct_risk_tiers():
 def test_update_device_records_undo_token_via_harness(monkeypatch):
     """update_device through the harness records an inverse (restore prior attrs)."""
     import fabric_aiops.governance.undo as undo_mod
-    from mcp_server.tools import remediation as rem
+    from fabric_aiops.mcp_server.tools import remediation as rem
 
     conn = MagicMock(name="conn")
     conn.get.return_value = {"serial": "Q2", "name": "old-name", "tags": ["a"]}
@@ -230,7 +230,7 @@ def test_update_device_captures_before_state():
 def test_bind_undo_rebinds_to_prior_template(monkeypatch):
     """bind captures the prior template so undo rebinds to it."""
     import fabric_aiops.governance.undo as undo_mod
-    from mcp_server.tools import remediation as rem
+    from fabric_aiops.mcp_server.tools import remediation as rem
 
     conn = MagicMock(name="conn")
     conn.get.return_value = {"id": "N1", "configTemplateId": "T-old"}
@@ -259,7 +259,7 @@ def test_dry_run_gates_destructive_cli(monkeypatch):
     available there. What it must never do is POST.
     """
     from fabric_aiops.cli import app
-    from mcp_server.tools import remediation as rem
+    from fabric_aiops.mcp_server.tools import remediation as rem
 
     conn = MagicMock(name="conn")
     monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
@@ -277,7 +277,7 @@ def test_mcp_write_dry_run_does_not_execute():
     """A write tool's dry_run returns a preview without calling the API."""
     from unittest.mock import patch
 
-    from mcp_server.tools import remediation as rem
+    from fabric_aiops.mcp_server.tools import remediation as rem
 
     conn = MagicMock(name="conn")
     with patch.object(rem, "_get_connection", lambda target=None: conn):
@@ -297,7 +297,7 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
     16 such mislabels line-wide once, so it is kept even though read-only mode
     (its original motivation) is gone.
     """
-    from mcp_server import server
+    from fabric_aiops.mcp_server import server
 
     untagged, mismatched = [], []
     for name, tool in server.mcp._tool_manager._tools.items():

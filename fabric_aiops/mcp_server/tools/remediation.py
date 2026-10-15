@@ -21,8 +21,8 @@ reversible); blink = low (a locator aid, no config change).
 from typing import Any, Optional
 
 from fabric_aiops.governance import governed_tool
+from fabric_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from fabric_aiops.ops import remediation as ops
-from mcp_server._shared import _get_connection, mcp, tool_errors
 
 # ── undo descriptors (built from the fetched before-state) ──────────────────
 

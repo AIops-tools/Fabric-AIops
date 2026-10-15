@@ -130,7 +130,7 @@ def test_real_write_tool_persists_priorstate_undo(gov_home, monkeypatch):
     conn.get.return_value = {"serial": "Q2AB-CDEF-GHIJ", "name": "old-name", "tags": ["a"]}
     conn.put.return_value = {}
 
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = gov.update_device(serial="Q2AB-CDEF-GHIJ", attrs={"name": "new-name"})

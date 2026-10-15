@@ -28,10 +28,10 @@ dev = [
 
 [project.scripts]
 fabric-aiops = "fabric_aiops.cli:app"
-fabric-aiops-mcp = "mcp_server.server:main"
+fabric-aiops-mcp = "fabric_aiops.mcp_server.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["fabric_aiops", "mcp_server"]
+packages = ["fabric_aiops"]
 
 [tool.ruff]
 line-length = 100
@@ -47,7 +47,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 "fabric_aiops/governance/*.py" = ["E501", "N818"]
 # MCP server files are reflected by FastMCP/Pydantic; PEP 604 unions (X | None)
 # crash on older mcp/pydantic, so they intentionally use Optional[X].
-"mcp_server/**/*.py" = ["UP007", "UP045"]
+"fabric_aiops/mcp_server/**/*.py" = ["UP007", "UP045"]
 # The MCP entry keeps an explicit Python-version guard even though the declared
 # minimum is already 3.11.
 "fabric_aiops/cli/_root.py" = ["UP036"]

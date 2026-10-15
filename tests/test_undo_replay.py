@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_server.tools import remediation as gov
+from fabric_aiops.mcp_server.tools import remediation as gov
 
 
 @pytest.mark.unit

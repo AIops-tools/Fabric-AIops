@@ -74,7 +74,7 @@ _WRITE_COMMANDS = [
     "argv,twin,stdin", _WRITE_COMMANDS, ids=[c[1] for c in _WRITE_COMMANDS]
 )
 def test_a_refused_write_exits_nonzero(gov_home, monkeypatch, argv, twin, stdin):
-    import mcp_server.tools.remediation as gov
+    import fabric_aiops.mcp_server.tools.remediation as gov
 
     _refuse(monkeypatch, gov, twin)
     result = runner.invoke(app, argv, input=stdin)
@@ -87,7 +87,7 @@ def test_a_refused_write_exits_nonzero(gov_home, monkeypatch, argv, twin, stdin)
 )
 def test_a_successful_write_still_exits_zero(gov_home, monkeypatch, argv, twin, stdin):
     """Exactness: the new gate must fire on refusals only."""
-    import mcp_server.tools.remediation as gov
+    import fabric_aiops.mcp_server.tools.remediation as gov
 
     monkeypatch.setattr(gov, twin, lambda **kwargs: {"action": twin, "ok": True})
     result = runner.invoke(app, argv, input=stdin)
@@ -105,7 +105,7 @@ def test_a_refused_undo_list_exits_nonzero(gov_home, monkeypatch):
     anything else. A CLI that exits 0 on a denied listing hands the caller an
     empty result that looks like "nothing recorded".
     """
-    import mcp_server.tools.undo as gov
+    import fabric_aiops.mcp_server.tools.undo as gov
 
     _refuse(monkeypatch, gov, "undo_list")
     result = runner.invoke(app, ["undo", "list"])
@@ -114,7 +114,7 @@ def test_a_refused_undo_list_exits_nonzero(gov_home, monkeypatch):
 
 
 def test_a_refused_undo_apply_exits_nonzero(gov_home, monkeypatch):
-    import mcp_server.tools.undo as gov
+    import fabric_aiops.mcp_server.tools.undo as gov
 
     _refuse(monkeypatch, gov, "undo_apply")
     result = runner.invoke(app, ["undo", "apply", "u-1"], input="y\ny\n")
@@ -124,7 +124,7 @@ def test_a_refused_undo_apply_exits_nonzero(gov_home, monkeypatch):
 
 def test_a_refused_undo_apply_dry_run_exits_nonzero(gov_home, monkeypatch):
     """A preview that was itself refused must not print a green DRY-RUN block."""
-    import mcp_server.tools.undo as gov
+    import fabric_aiops.mcp_server.tools.undo as gov
 
     _refuse(monkeypatch, gov, "undo_apply")
     result = runner.invoke(app, ["undo", "apply", "u-1", "--dry-run"])
@@ -133,7 +133,7 @@ def test_a_refused_undo_apply_dry_run_exits_nonzero(gov_home, monkeypatch):
 
 
 def test_undo_list_still_exits_zero_when_it_succeeds(gov_home, monkeypatch):
-    import mcp_server.tools.undo as gov
+    import fabric_aiops.mcp_server.tools.undo as gov
 
     monkeypatch.setattr(
         gov, "undo_list",

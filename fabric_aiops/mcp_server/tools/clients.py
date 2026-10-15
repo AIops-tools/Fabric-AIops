@@ -3,8 +3,8 @@
 from typing import Optional
 
 from fabric_aiops.governance import governed_tool
+from fabric_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from fabric_aiops.ops import clients as ops
-from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
 @mcp.tool()

@@ -121,7 +121,7 @@ def test_config_template_drift_flags_deviations():
 
 @pytest.mark.unit
 def test_health_tools_are_governed_low_and_run():
-    from mcp_server.tools import health as tools
+    from fabric_aiops.mcp_server.tools import health as tools
 
     for fn in (
         tools.uplink_loss_and_latency_rca,

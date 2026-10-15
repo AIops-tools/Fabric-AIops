@@ -71,7 +71,7 @@ EXIT_UNDETERMINED = 2
 def governed(result: Any) -> dict:
     """Return a governed tool's result, or print its error and exit 1.
 
-    The ``mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
+    The ``fabric_aiops.mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
     failure — a refused bind, an unreachable Dashboard API — into
     ``{"error": ...}``. Printing that dict makes the refusal visible to a
     human but still exits 0, so a CI job or a shell ``&&`` chain reads a REFUSED

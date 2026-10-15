@@ -141,7 +141,7 @@ def test_config_template_drift_announces_truncation():
 
 @pytest.mark.unit
 def test_undo_list_measures_truncation_with_an_extra_row(monkeypatch):
-    from mcp_server.tools import undo as gov
+    from fabric_aiops.mcp_server.tools import undo as gov
 
     asked = {}
 
@@ -165,7 +165,7 @@ def test_undo_list_measures_truncation_with_an_extra_row(monkeypatch):
 
 @pytest.mark.unit
 def test_undo_list_is_not_truncated_when_fewer_rows_exist(monkeypatch):
-    from mcp_server.tools import undo as gov
+    from fabric_aiops.mcp_server.tools import undo as gov
 
     class _Store:
         def list(self, status, limit):

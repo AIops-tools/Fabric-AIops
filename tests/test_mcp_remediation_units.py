@@ -14,7 +14,7 @@ import pytest
 import fabric_aiops.governance.audit as audit_mod
 import fabric_aiops.governance.policy as policy_mod
 import fabric_aiops.governance.undo as undo_mod
-from mcp_server.tools import remediation as gov
+from fabric_aiops.mcp_server.tools import remediation as gov
 
 
 @pytest.fixture

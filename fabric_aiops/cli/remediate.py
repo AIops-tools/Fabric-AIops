@@ -1,7 +1,7 @@
 """``fabric-aiops remediate`` — guarded Meraki writes (dry-run + double-confirm).
 
 Real writes are delegated to the ``@governed_tool``-decorated functions in
-``mcp_server.tools.remediation`` so every CLI write is audited, budget-counted,
+``fabric_aiops.mcp_server.tools.remediation`` so every CLI write is audited, budget-counted,
 risk-tiered and undo-recorded by the governance harness — the same path the MCP
 tools take. The dry-run preview and double-confirm gate stay in the CLI.
 
@@ -52,7 +52,7 @@ NetIdArg = Annotated[str, typer.Argument(help="Network id")]
 @cli_errors
 def reboot(serial: SerialArg, target: TargetOption = None, dry_run: DryRunOption = False) -> None:
     """Reboot a device (no undo; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         preview = governed(gov.reboot_device(serial=serial, dry_run=True, target=target))
@@ -74,7 +74,7 @@ def blink_leds(
     target: TargetOption = None,
 ) -> None:
     """Blink a device's locator LEDs (low risk; no confirm needed)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     console.print_json(
         json.dumps(governed(gov.blink_device_leds(serial=serial, duration=duration, target=target)))
@@ -90,7 +90,7 @@ def update_device(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update device attributes (captures before-state; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     attrs = json.loads(attrs_json)
     if dry_run:
@@ -119,7 +119,7 @@ def update_vlan(
     dry_run: DryRunOption = False,
 ) -> None:
     """Update an appliance VLAN (captures before-state; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     attrs = json.loads(attrs_json)
     if dry_run:
@@ -155,7 +155,7 @@ def claim(
     dry_run: DryRunOption = False,
 ) -> None:
     """Claim devices into a network (dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         preview = governed(
@@ -190,7 +190,7 @@ def remove(
     dry_run: DryRunOption = False,
 ) -> None:
     """Remove a device from a network (dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         preview = governed(
@@ -229,7 +229,7 @@ def bind(
 
     Refuses when the bind would overwrite local VLANs this tool cannot restore.
     """
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         # Through the governed twin, which runs the refusal check (a read) before
@@ -280,7 +280,7 @@ def unbind(
     dry_run: DryRunOption = False,
 ) -> None:
     """Unbind a network from its config template (captures before-state; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from fabric_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         preview = governed(

@@ -1,7 +1,7 @@
 """CLI confirmed-write path — past dry-run, through governance, onto disk.
 
 The CLI write commands delegate real execution to the ``@governed_tool``
-functions in ``mcp_server.tools``. These tests drive a write command PAST the
+functions in ``fabric_aiops.mcp_server.tools``. These tests drive a write command PAST the
 dry-run branch and the double-confirm prompts and assert the call really went
 through the governed path (audit row on disk) — the regression test for the
 "CLI writes were unaudited" line-wide fix.
@@ -60,7 +60,7 @@ def test_cli_update_device_dry_run_reads_and_audits_but_never_writes(gov_home, m
     from fabric_aiops.cli import app
 
     conn = _mock_conn()
-    import mcp_server.tools.remediation as gov
+    import fabric_aiops.mcp_server.tools.remediation as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = CliRunner().invoke(
@@ -80,7 +80,7 @@ def test_cli_update_device_confirmed_goes_through_governance(gov_home, monkeypat
     from fabric_aiops.cli import app
 
     conn = _mock_conn()
-    import mcp_server.tools.remediation as gov
+    import fabric_aiops.mcp_server.tools.remediation as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = CliRunner().invoke(
@@ -98,7 +98,7 @@ def test_cli_update_device_aborts_without_double_confirm(gov_home, monkeypatch):
     from fabric_aiops.cli import app
 
     conn = _mock_conn()
-    import mcp_server.tools.remediation as gov
+    import fabric_aiops.mcp_server.tools.remediation as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = CliRunner().invoke(

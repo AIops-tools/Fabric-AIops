@@ -84,7 +84,7 @@ def test_dry_run_reads_and_audits_but_never_writes(gov_home, monkeypatch, args, 
     outlier. The one thing it may never do is issue the mutating POST/PUT.
     """
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, args)
@@ -121,7 +121,7 @@ def test_cli_dry_run_on_an_unsupported_platform_refuses_nonzero(gov_home, monkey
     """
     conn = _mock_conn()
     conn.target = TargetConfig(name="t", platform=CATALYST)
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, args)
@@ -142,7 +142,7 @@ def test_cli_dry_run_still_previews_on_a_platform_that_maps_the_write(gov_home, 
     """
     conn = _mock_conn()
     conn.target = TargetConfig(name="t", platform=UNIFI)
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "reboot", "Q2", "--dry-run"])
@@ -158,7 +158,7 @@ def test_cli_dry_run_still_previews_on_a_platform_that_maps_the_write(gov_home, 
 @pytest.mark.unit
 def test_reboot_confirmed_audits_and_calls_controller(gov_home, monkeypatch):
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "reboot", "Q2"], input="y\ny\n")
@@ -170,7 +170,7 @@ def test_reboot_confirmed_audits_and_calls_controller(gov_home, monkeypatch):
 @pytest.mark.unit
 def test_blink_needs_no_confirm_and_audits(gov_home, monkeypatch):
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "blink-leds", "Q2", "--duration", "15"])
@@ -183,7 +183,7 @@ def test_blink_needs_no_confirm_and_audits(gov_home, monkeypatch):
 def test_update_vlan_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
     conn = _mock_conn()
     conn.get.return_value = {"id": "10", "name": "old-vlan"}
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(
@@ -197,7 +197,7 @@ def test_update_vlan_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
 @pytest.mark.unit
 def test_claim_confirmed_audits(gov_home, monkeypatch):
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "claim", "N1", "Q2", "Q3"], input="y\ny\n")
@@ -209,7 +209,7 @@ def test_claim_confirmed_audits(gov_home, monkeypatch):
 @pytest.mark.unit
 def test_remove_confirmed_audits(gov_home, monkeypatch):
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "remove", "N1", "Q2"], input="y\ny\n")
@@ -222,7 +222,7 @@ def test_remove_confirmed_audits(gov_home, monkeypatch):
 def test_bind_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
     conn = _mock_conn()
     conn.get.return_value = {"id": "N1", "configTemplateId": "T-old"}
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "bind", "N1", "T1", "--auto-bind"], input="y\ny\n")
@@ -235,7 +235,7 @@ def test_bind_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
 def test_unbind_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
     conn = _mock_conn()
     conn.get.return_value = {"id": "N1", "configTemplateId": "T-old"}
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "unbind", "N1"], input="y\ny\n")
@@ -247,7 +247,7 @@ def test_unbind_confirmed_captures_prior_and_audits(gov_home, monkeypatch):
 @pytest.mark.unit
 def test_confirmed_write_aborts_without_second_confirm(gov_home, monkeypatch):
     conn = _mock_conn()
-    import mcp_server.tools.remediation as govmod
+    import fabric_aiops.mcp_server.tools.remediation as govmod
 
     monkeypatch.setattr(govmod, "_get_connection", lambda target=None: conn)
     result = runner.invoke(app, ["remediate", "reboot", "Q2"], input="y\nn\n")

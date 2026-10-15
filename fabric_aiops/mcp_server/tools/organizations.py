@@ -3,10 +3,10 @@
 from typing import Optional
 
 from fabric_aiops.governance import governed_tool
+from fabric_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from fabric_aiops.ops import organizations as ops
 from fabric_aiops.ops import overview as ov
 from fabric_aiops.ops.organizations import DEFAULT_DEVICE_LIMIT
-from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
 @mcp.tool()

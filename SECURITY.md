@@ -72,7 +72,7 @@ API base URL. No post-install scripts or background services.
 ## Static Analysis
 
 ```bash
-uvx bandit -r fabric_aiops/ mcp_server/
+uvx bandit -r fabric_aiops/
 uv run ruff check .
 ```
 
