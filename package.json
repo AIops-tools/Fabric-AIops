@@ -1,6 +1,6 @@
 {
   "name": "@zw008/fabric-aiops",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "description": "Governed Cisco Meraki + ACI fabric ops: uplink RCA, ACI endpoint trace; 37 tools with audit/undo.",
   "private": true,
   "license": "MIT",
