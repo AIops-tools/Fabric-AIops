@@ -31,6 +31,8 @@ compatibility: >
 
 # Fabric AIops
 
+> **Audit availability:** Real writes require a durable audit intent. Reads and previews can continue if audit storage fails; check the warning and audit health before relying on their audit trail.
+
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Cisco, Meraki, Arista, Ubiquiti, or any network-controller vendor.** Product and trademark names belong to their owners. Source at [github.com/AIops-tools/Fabric-AIops](https://github.com/AIops-tools/Fabric-AIops) under the MIT license.
 
 Governed network-fabric controller operations — **37 MCP tools** over **five platforms** (Cisco Meraki Dashboard: full read+write; Cisco Catalyst Center and Arista CloudVision Portal: read subsets; UniFi Network: read subset + device restart; Cisco ACI APIC: read-only endpoint path trace, EPG segment and faults), every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.fabric-aiops/`, token/runaway budget guard, undo-token recording, and descriptive risk tiers. The controller secret is stored **encrypted** (`~/.fabric-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
@@ -167,7 +169,7 @@ of the account you connect it with (a Meraki API key whose admin has read-only
 organization access — writes then fail at the controller). There is no read-only
 switch, policy file, or approval gate.
 
-- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.fabric-aiops/audit.db` (relocatable via `FABRIC_AIOPS_HOME`): params, result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.fabric-aiops/audit.db` (relocatable via `FABRIC_AIOPS_HOME`): params, outcome summary, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
 - `FABRIC_AUDIT_APPROVED_BY` / `FABRIC_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
 - **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `FABRIC_RUNAWAY_MAX=0`.
 - Destructive writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI.
